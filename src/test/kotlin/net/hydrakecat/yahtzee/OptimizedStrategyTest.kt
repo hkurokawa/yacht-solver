@@ -169,25 +169,34 @@ class OptimizedStrategyTest {
 
     @Test
     fun computeExpectedScore_onlyYachtAvailable() {
-        val actual = strategy.computeExpectedScore(EnumSet.of(Category.YACHT))
+        val actual = strategy.computeExpectedScore(EnumSet.of(Category.YACHT), 0)
 
         // The probability of Yacht is 4.60% and the estimated score equals to 50 * 4.60%
         assertThat(actual).isEqualTo(2.3014321262849475)
     }
 
     @Test
-    fun computeExpectedScore_onlyLowerSectionAvailable() {
-        val actual =
-            strategy.computeExpectedScore(EnumSet.range(Category.THREE_OF_A_KIND, Category.CHANCE))
+    fun computeExpectedScore_onlyLowerSectionsAvailable() {
+        val actual = strategy.computeExpectedScore(
+            EnumSet.range(Category.THREE_OF_A_KIND, Category.CHANCE),
+            0
+        )
         assertThat(actual).isEqualTo(139.97129244237908)
     }
 
     @Test
-    fun computeExpectedScore_onlyUpperSectionAvailable() {
+    fun computeExpectedScore_onlyUpperSectionsAvailable() {
         val actual =
-            strategy.computeExpectedScore(EnumSet.range(Category.ACES, Category.SIXES))
-        assertThat(actual).isEqualTo(59.16320043538697)
+            strategy.computeExpectedScore(EnumSet.range(Category.ACES, Category.SIXES), 0)
+        assertThat(actual).isEqualTo(71.95152973371323)
     }
+
+//    @Test
+//    fun computeExpectedScore_allSectionsAvailable() {
+//        val actual =
+//            strategy.computeExpectedScore(EnumSet.allOf(Category::class.java), 0)
+//        assertThat(actual).isEqualTo(245.87)
+//    }
 }
 
 private fun wrapIntArrayOf(vararg elements: Int) = intArrayOf(*elements).wrap()

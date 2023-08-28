@@ -14,14 +14,22 @@ private const val M = 6
 // Num rolls in a turn
 private const val R = 3
 
+// Upper section bonus criteria
+private const val UPPER_BONUS_MIN = 63
+
+private const val UPPER_BONUS = 35
+
 class OptimizedStrategy {
     private val memoizedBetweenTurnsE = HashMap<BetweenTurnsState, Double>()
 
-    private val memoizedWithinTurnE = HashMap<Pair<Set<Category>, WithinTurnState>, Double>()
+    private val memoizedWithinTurnE = HashMap<WithinTurnState, Double>()
 
 
-    fun computeExpectedScore(availableCategories: Set<Category>): Double {
-        return computeExpectedScore(BetweenTurnsState(availableCategories))
+    fun computeExpectedScore(
+        availableCategories: Set<Category>,
+        upperScoreLevel: Int,
+    ): Double {
+        return computeExpectedScore(BetweenTurnsState(availableCategories, upperScoreLevel))
     }
 
     private fun computeExpectedScore(state: BetweenTurnsState): Double {
@@ -30,30 +38,33 @@ class OptimizedStrategy {
                 return@getOrPut 0.0
             }
             computeExpectedScore(
-                state.availableCategories,
-                WithinTurnState(R, IntArray(M))
+                WithinTurnState(state.availableCategories, state.upperScoreLevel, R, IntArray(M))
             )
         }
     }
 
     private fun computeExpectedScore(
-        availableCategories: Set<Category>,
         state: WithinTurnState,
     ): Double {
-        return memoizedWithinTurnE.getOrPut(
-            Pair(
-                availableCategories,
-                state
-            )
-        ) {
+        return memoizedWithinTurnE.getOrPut(state) {
             val n = state.numRollsRemaining
             if (n == 0) {
                 var max = 0.0
-                for (c in availableCategories) {
-                    val score =
-                        c.score(state.rolledDice) + computeExpectedScore(
-                            availableCategories - c
-                        )
+                for (c in state.availableCategories) {
+                    var scoreGained = c.score(state.rolledDice)
+                    var expectedUpperScoreLevel = state.upperScoreLevel
+                    if (UPPER_SECTION_CATEGORIES.contains(c)) {
+                        expectedUpperScoreLevel += scoreGained
+                        expectedUpperScoreLevel =
+                            expectedUpperScoreLevel.coerceAtMost(UPPER_BONUS_MIN)
+                        if (UPPER_BONUS_MIN in (state.upperScoreLevel + 1)..expectedUpperScoreLevel) {
+                            scoreGained += UPPER_BONUS
+                        }
+                    }
+                    val score = scoreGained + computeExpectedScore(
+                        state.availableCategories - c,
+                        expectedUpperScoreLevel
+                    )
                     max = max(max, score)
                 }
                 return@getOrPut max
@@ -63,8 +74,11 @@ class OptimizedStrategy {
                 var score = 0.0
                 for ((rolls, probability) in rolledDiceDist(N - Arrays.stream(keep).sum())) {
                     score += computeExpectedScore(
-                        availableCategories, WithinTurnState(
-                            n - 1, rolls.merge(keep)
+                        WithinTurnState(
+                            state.availableCategories,
+                            state.upperScoreLevel,
+                            n - 1,
+                            rolls.merge(keep)
                         )
                     ) * probability
                 }
@@ -154,6 +168,8 @@ class OptimizedStrategy {
     }
 }
 
+private val UPPER_SECTION_CATEGORIES = EnumSet.range(Category.ACES, Category.SIXES)
+
 enum class Category {
     ACES,
     TWOS,
@@ -242,9 +258,29 @@ data class Roll(val rolls: IntArray, val probability: Double) {
     }
 }
 
-private data class BetweenTurnsState(val availableCategories: Set<Category>)
+/**
+ * The state between the turns.
+ *
+ * @param availableCategories set of available categories
+ * @param upperScoreLevel level of the total score of the upper sections (from [Category.ACES] to
+ * [Category.SIXES]) to compute the upper section bonus.  The value ranges from 0 to
+ * [UPPER_BONUS_MIN] since the value greater than [UPPER_BONUS_MIN] does not need to be taken into
+ * account to compute the estimated score.
+ */
+private data class BetweenTurnsState(
+    val availableCategories: Set<Category>,
+    val upperScoreLevel: Int,
+) {
+    init {
+        require(upperScoreLevel in 0..UPPER_BONUS_MIN) {
+            "Invalid upper score level: $upperScoreLevel"
+        }
+    }
+}
 
 private data class WithinTurnState(
+    val availableCategories: Set<Category>,
+    val upperScoreLevel: Int,
     val numRollsRemaining: Int,
     val rolledDice: IntArray,
 ) {
@@ -262,6 +298,8 @@ private data class WithinTurnState(
         if (this === other) return true
         if (other !is WithinTurnState) return false
 
+        if (availableCategories != other.availableCategories) return false
+        if (upperScoreLevel != other.upperScoreLevel) return false
         if (numRollsRemaining != other.numRollsRemaining) return false
         if (!rolledDice.contentEquals(other.rolledDice)) return false
 
@@ -269,8 +307,11 @@ private data class WithinTurnState(
     }
 
     override fun hashCode(): Int {
-        var result = numRollsRemaining
+        var result = availableCategories.hashCode()
+        result = 31 * result + upperScoreLevel
+        result = 31 * result + numRollsRemaining
         result = 31 * result + rolledDice.contentHashCode()
         return result
     }
+
 }
