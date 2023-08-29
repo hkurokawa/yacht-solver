@@ -138,31 +138,31 @@ class OptimizedStrategyTest {
 
     @Test
     fun rolledDiceDist_2dices() {
-        val rollsDist: List<Roll> = strategy.rolledDiceDist(2)
+        val rollsDist: List<RollWithProbability> = strategy.rolledDiceDist(2)
         assertThat(rollsDist)
             .containsExactlyElementsIn(
                 listOf(
-                    Roll(intArrayOf(2, 0, 0, 0, 0, 0), 1 / 36.0),
-                    Roll(intArrayOf(0, 2, 0, 0, 0, 0), 1 / 36.0),
-                    Roll(intArrayOf(0, 0, 2, 0, 0, 0), 1 / 36.0),
-                    Roll(intArrayOf(0, 0, 0, 2, 0, 0), 1 / 36.0),
-                    Roll(intArrayOf(0, 0, 0, 0, 2, 0), 1 / 36.0),
-                    Roll(intArrayOf(0, 0, 0, 0, 0, 2), 1 / 36.0),
-                    Roll(intArrayOf(1, 1, 0, 0, 0, 0), 1 / 18.0),
-                    Roll(intArrayOf(1, 0, 1, 0, 0, 0), 1 / 18.0),
-                    Roll(intArrayOf(1, 0, 0, 1, 0, 0), 1 / 18.0),
-                    Roll(intArrayOf(1, 0, 0, 0, 1, 0), 1 / 18.0),
-                    Roll(intArrayOf(1, 0, 0, 0, 0, 1), 1 / 18.0),
-                    Roll(intArrayOf(0, 1, 1, 0, 0, 0), 1 / 18.0),
-                    Roll(intArrayOf(0, 1, 0, 1, 0, 0), 1 / 18.0),
-                    Roll(intArrayOf(0, 1, 0, 0, 1, 0), 1 / 18.0),
-                    Roll(intArrayOf(0, 1, 0, 0, 0, 1), 1 / 18.0),
-                    Roll(intArrayOf(0, 0, 1, 1, 0, 0), 1 / 18.0),
-                    Roll(intArrayOf(0, 0, 1, 0, 1, 0), 1 / 18.0),
-                    Roll(intArrayOf(0, 0, 1, 0, 0, 1), 1 / 18.0),
-                    Roll(intArrayOf(0, 0, 0, 1, 1, 0), 1 / 18.0),
-                    Roll(intArrayOf(0, 0, 0, 1, 0, 1), 1 / 18.0),
-                    Roll(intArrayOf(0, 0, 0, 0, 1, 1), 1 / 18.0)
+                    RollWithProbability(intArrayOf(2, 0, 0, 0, 0, 0), 1 / 36.0),
+                    RollWithProbability(intArrayOf(0, 2, 0, 0, 0, 0), 1 / 36.0),
+                    RollWithProbability(intArrayOf(0, 0, 2, 0, 0, 0), 1 / 36.0),
+                    RollWithProbability(intArrayOf(0, 0, 0, 2, 0, 0), 1 / 36.0),
+                    RollWithProbability(intArrayOf(0, 0, 0, 0, 2, 0), 1 / 36.0),
+                    RollWithProbability(intArrayOf(0, 0, 0, 0, 0, 2), 1 / 36.0),
+                    RollWithProbability(intArrayOf(1, 1, 0, 0, 0, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(1, 0, 1, 0, 0, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(1, 0, 0, 1, 0, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(1, 0, 0, 0, 1, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(1, 0, 0, 0, 0, 1), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 1, 1, 0, 0, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 1, 0, 1, 0, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 1, 0, 0, 1, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 1, 0, 0, 0, 1), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 0, 1, 1, 0, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 0, 1, 0, 1, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 0, 1, 0, 0, 1), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 0, 0, 1, 1, 0), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 0, 0, 1, 0, 1), 1 / 18.0),
+                    RollWithProbability(intArrayOf(0, 0, 0, 0, 1, 1), 1 / 18.0)
                 )
             )
     }

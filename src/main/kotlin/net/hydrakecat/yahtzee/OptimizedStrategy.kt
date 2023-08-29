@@ -24,6 +24,9 @@ class OptimizedStrategy {
 
     private val memoizedWithinTurnE = HashMap<WithinTurnState, Double>()
 
+    private val memoizedChooseKeep = HashMap<Roll, List<Roll>>()
+
+    private val memoizedRollWithProbability = HashMap<Int, List<RollWithProbability>>()
 
     fun computeExpectedScore(
         availableCategories: Set<Category>,
@@ -38,7 +41,12 @@ class OptimizedStrategy {
                 return@getOrPut 0.0
             }
             computeExpectedScore(
-                WithinTurnState(state.availableCategories, state.upperScoreLevel, R, IntArray(M))
+                WithinTurnState(
+                    state.availableCategories,
+                    state.upperScoreLevel,
+                    R,
+                    Roll(IntArray(M))
+                )
             )
         }
     }
@@ -51,7 +59,7 @@ class OptimizedStrategy {
             if (n == 0) {
                 var max = 0.0
                 for (c in state.availableCategories) {
-                    var scoreGained = c.score(state.rolledDice)
+                    var scoreGained = c.score(state.rolledDice.dist)
                     var expectedUpperScoreLevel = state.upperScoreLevel
                     if (UPPER_SECTION_CATEGORIES.contains(c)) {
                         expectedUpperScoreLevel += scoreGained
@@ -70,15 +78,15 @@ class OptimizedStrategy {
                 return@getOrPut max
             }
             var max = 0.0
-            for (keep in chooseKeep(state.rolledDice)) {
+            for (keep in state.rolledDice.chooseKeep()) {
                 var score = 0.0
-                for ((rolls, probability) in rolledDiceDist(N - Arrays.stream(keep).sum())) {
+                for ((rolls, probability) in rolledDiceDist(N - keep.dist.sum())) {
                     score += computeExpectedScore(
                         WithinTurnState(
                             state.availableCategories,
                             state.upperScoreLevel,
                             n - 1,
-                            rolls.merge(keep)
+                            rolls + keep,
                         )
                     ) * probability
                 }
@@ -88,11 +96,17 @@ class OptimizedStrategy {
         }
     }
 
+    private fun Roll.chooseKeep(): List<Roll> {
+        return memoizedChooseKeep.getOrPut(this) {
+            chooseKeep(this.dist).map { Roll(it) }
+        }
+    }
+
     // Returns all the possible dices to keep
-    fun chooseKeep(rolledDice: IntArray): List<IntArray> {
+    fun chooseKeep(rolledDiceDist: IntArray): List<IntArray> {
         val list: MutableList<IntArray> = ArrayList()
-        for (i in 0..Arrays.stream(rolledDice).sum()) {
-            list.addAll(chooseKeepIter(rolledDice, 0, IntArray(M), i))
+        for (i in 0..Arrays.stream(rolledDiceDist).sum()) {
+            list.addAll(chooseKeepIter(rolledDiceDist, 0, IntArray(M), i))
         }
         return list
     }
@@ -120,21 +134,23 @@ class OptimizedStrategy {
     }
 
     // Returns all the possible rolled dices for num dices with its probability
-    fun rolledDiceDist(num: Int): List<Roll> {
-        val rolls = rolledDiceIter(0, IntArray(M), num)
-        return rolls.map { roll: IntArray ->
-            check(
-                roll.sum() == num
-            ) { "Total num of rolls should be equal to $num : ${roll.contentToString()}" }
-            var p = 1.0
-            var n = num
-            for (c in roll) {
-                if (c == 0) continue
-                p *= ncr(n, c)
-                n -= c
+    fun rolledDiceDist(num: Int): List<RollWithProbability> {
+        return memoizedRollWithProbability.getOrPut(num) {
+            val rolls = rolledDiceIter(0, IntArray(M), num)
+            rolls.map { roll: IntArray ->
+                check(
+                    roll.sum() == num
+                ) { "Total num of rolls should be equal to $num : ${roll.contentToString()}" }
+                var p = 1.0
+                var n = num
+                for (c in roll) {
+                    if (c == 0) continue
+                    p *= ncr(n, c)
+                    n -= c
+                }
+                p /= M.toDouble().pow(num.toDouble())
+                RollWithProbability(roll, p)
             }
-            p /= M.toDouble().pow(num.toDouble())
-            Roll(roll, p)
         }
     }
 
@@ -158,13 +174,6 @@ class OptimizedStrategy {
             list.addAll(rolledDiceIter(i, u, numDices - 1))
         }
         return list
-    }
-
-    private fun IntArray.merge(other: IntArray): IntArray {
-        for (i in other.indices) {
-            this[i] += other[i]
-        }
-        return this
     }
 }
 
@@ -240,22 +249,35 @@ private fun IntArray.computeSumFaces(): Int {
     return this.mapIndexed { index, i -> (index + 1) * i }.sum()
 }
 
-data class Roll(val rolls: IntArray, val probability: Double) {
+data class Roll(val dist: IntArray) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is Roll) return false
 
-        if (!rolls.contentEquals(other.rolls)) return false
-        if (probability != other.probability) return false
+        if (!dist.contentEquals(other.dist)) return false
 
         return true
     }
 
     override fun hashCode(): Int {
-        var result = rolls.contentHashCode()
-        result = 31 * result + probability.hashCode()
-        return result
+        return dist.contentHashCode()
     }
+
+    override fun toString(): String {
+        return dist.contentToString()
+    }
+
+    operator fun plus(other: Roll): Roll {
+        val s = this.dist.copyOf()
+        for (i in other.dist.indices) {
+            s[i] += other.dist[i]
+        }
+        return Roll(s)
+    }
+}
+
+data class RollWithProbability(val roll: Roll, val probability: Double) {
+    constructor(dist: IntArray, probability: Double) : this(Roll(dist), probability)
 }
 
 /**
@@ -282,36 +304,15 @@ private data class WithinTurnState(
     val availableCategories: Set<Category>,
     val upperScoreLevel: Int,
     val numRollsRemaining: Int,
-    val rolledDice: IntArray,
+    val rolledDice: Roll,
 ) {
     init {
-        require(isValid(numRollsRemaining, rolledDice)) {
-            "Invalid arguments: numRollsRemaining=$numRollsRemaining, rolledDice=${rolledDice.contentToString()}"
+        require(isValid(numRollsRemaining, rolledDice.dist)) {
+            "Invalid arguments: numRollsRemaining=$numRollsRemaining, rolledDice=$rolledDice"
         }
     }
 
-    private fun isValid(numRollsRemaining: Int, rolledDice: IntArray): Boolean {
-        return rolledDice.size == M && if (numRollsRemaining == R) rolledDice.all { it == 0 } else rolledDice.sum() == N
+    private fun isValid(numRollsRemaining: Int, rolledDiceDist: IntArray): Boolean {
+        return rolledDiceDist.size == M && if (numRollsRemaining == R) rolledDiceDist.all { it == 0 } else rolledDiceDist.sum() == N
     }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is WithinTurnState) return false
-
-        if (availableCategories != other.availableCategories) return false
-        if (upperScoreLevel != other.upperScoreLevel) return false
-        if (numRollsRemaining != other.numRollsRemaining) return false
-        if (!rolledDice.contentEquals(other.rolledDice)) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = availableCategories.hashCode()
-        result = 31 * result + upperScoreLevel
-        result = 31 * result + numRollsRemaining
-        result = 31 * result + rolledDice.contentHashCode()
-        return result
-    }
-
 }
