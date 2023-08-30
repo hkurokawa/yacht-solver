@@ -22,11 +22,32 @@ private const val UPPER_BONUS = 35
 class OptimizedStrategy {
     private val memoizedBetweenTurnsE = HashMap<BetweenTurnsState, Double>()
 
-    private val memoizedWithinTurnE = HashMap<WithinTurnState, Double>()
+    private val rollsDistWithProbability = Array(N + 1) { ArrayList<Pair<IntArray, Double>>() }
 
-    private val memoizedChooseKeep = HashMap<Roll, List<Roll>>()
+    private val rollsDistSubset =
+        Array(N + 1) { Array(N + 1) { Array(N + 1) { Array(N + 1) { Array(N + 1) { Array(N + 1) { ArrayList<IntArray>() } } } } } }
 
-    private val memoizedRollWithProbability = HashMap<Int, List<RollWithProbability>>()
+    init {
+        for (n in 0..N) {
+            for ((dist, probability) in rolledDiceDist(n)) {
+                rollsDistWithProbability[n].add(Pair(dist.dist, probability))
+            }
+        }
+
+        for (i in 0..N) {
+            for (j in 0..N - i) {
+                for (k in 0..N - i - j) {
+                    for (l in 0..N - i - j - k) {
+                        for (m in 0..N - i - j - k - l) {
+                            val n = N - i - j - k - l - m
+                            val d = intArrayOf(i, j, k, l, m, n)
+                            rollsDistSubset[i][j][k][l][m][n].addAll(chooseKeep(d))
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     fun computeExpectedScore(
         availableCategories: Set<Category>,
@@ -40,66 +61,85 @@ class OptimizedStrategy {
             if (state.availableCategories.isEmpty()) {
                 return@getOrPut 0.0
             }
-            computeExpectedScore(
-                WithinTurnState(
-                    state.availableCategories,
-                    state.upperScoreLevel,
-                    R,
-                    Roll(IntArray(M))
-                )
+            computeWithinTurnExpectedScore(
+                state.availableCategories,
+                state.upperScoreLevel,
             )
         }
     }
 
-    private fun computeExpectedScore(
-        state: WithinTurnState,
+    private fun computeWithinTurnExpectedScore(
+        categories: Set<Category>,
+        upperScoreLevel: Int,
     ): Double {
-        return memoizedWithinTurnE.getOrPut(state) {
-            val n = state.numRollsRemaining
-            if (n == 0) {
-                var max = 0.0
-                for (c in state.availableCategories) {
-                    var scoreGained = c.score(state.rolledDice.dist)
-                    var expectedUpperScoreLevel = state.upperScoreLevel
-                    if (UPPER_SECTION_CATEGORIES.contains(c)) {
-                        expectedUpperScoreLevel += scoreGained
-                        expectedUpperScoreLevel =
-                            expectedUpperScoreLevel.coerceAtMost(UPPER_BONUS_MIN)
-                        if (UPPER_BONUS_MIN in (state.upperScoreLevel + 1)..expectedUpperScoreLevel) {
-                            scoreGained += UPPER_BONUS
+        val s = N + 1
+        val dp =
+            Array(R) { Array(s) { Array(s) { Array(s) { Array(s) { Array(s) { DoubleArray(s) } } } } } }
+        for (i in 0..N) {
+            for (j in 0..N - i) {
+                for (k in 0..N - i - j) {
+                    for (l in 0..N - i - j - k) {
+                        for (m in 0..N - i - j - k - l) {
+                            val n = N - i - j - k - l - m
+                            dp[0][i][j][k][l][m][n] = 0.0
+                            for (c in categories) {
+                                var scoreGained = c.score(intArrayOf(i, j, k, l, m, n))
+                                var expectedUpperScoreLevel = upperScoreLevel
+                                if (UPPER_SECTION_CATEGORIES.contains(c)) {
+                                    expectedUpperScoreLevel += scoreGained
+                                    expectedUpperScoreLevel =
+                                        expectedUpperScoreLevel.coerceAtMost(UPPER_BONUS_MIN)
+                                    if (UPPER_BONUS_MIN in (upperScoreLevel + 1)..expectedUpperScoreLevel) {
+                                        scoreGained += UPPER_BONUS
+                                    }
+                                }
+                                val score = scoreGained + computeExpectedScore(
+                                    categories - c,
+                                    expectedUpperScoreLevel,
+                                )
+                                dp[0][i][j][k][l][m][n] = max(dp[0][i][j][k][l][m][n], score)
+                            }
                         }
                     }
-                    val score = scoreGained + computeExpectedScore(
-                        state.availableCategories - c,
-                        expectedUpperScoreLevel
-                    )
-                    max = max(max, score)
                 }
-                return@getOrPut max
             }
-            var max = 0.0
-            for (keep in state.rolledDice.chooseKeep()) {
-                var score = 0.0
-                for ((rolls, probability) in rolledDiceDist(N - keep.dist.sum())) {
-                    score += computeExpectedScore(
-                        WithinTurnState(
-                            state.availableCategories,
-                            state.upperScoreLevel,
-                            n - 1,
-                            rolls + keep,
-                        )
-                    ) * probability
-                }
-                max = max(max, score)
-            }
-            max
         }
+        for (t in 1..<R) {
+            for (i in 0..N) {
+                for (j in 0..N - i) {
+                    for (k in 0..N - i - j) {
+                        for (l in 0..N - i - j - k) {
+                            for (m in 0..N - i - j - k - l) {
+                                val n = N - i - j - k - l - m
+                                for (keep in rollsDistSubset[i][j][k][l][m][n]) {
+                                    var score = 0.0
+                                    for (rwp in rollsDistWithProbability[N - keep.sum()]) {
+                                        val d = rwp.first.merge(keep)
+                                        score += dp[t - 1][d[0]][d[1]][d[2]][d[3]][d[4]][d[5]] * rwp.second
+                                    }
+                                    dp[t][i][j][k][l][m][n] = max(dp[t][i][j][k][l][m][n], score)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        var e = 0.0
+        for ((rolls, probability) in rolledDiceDist(N)) {
+            val d = rolls.dist
+            e += dp[2][d[0]][d[1]][d[2]][d[3]][d[4]][d[5]] * probability
+        }
+        return e
     }
 
-    private fun Roll.chooseKeep(): List<Roll> {
-        return memoizedChooseKeep.getOrPut(this) {
-            chooseKeep(this.dist).map { Roll(it) }
+
+    private fun IntArray.merge(other: IntArray): IntArray {
+        val r = copyOf()
+        for (i in r.indices) {
+            r[i] += other[i]
         }
+        return r
     }
 
     // Returns all the possible dices to keep
@@ -135,22 +175,20 @@ class OptimizedStrategy {
 
     // Returns all the possible rolled dices for num dices with its probability
     fun rolledDiceDist(num: Int): List<RollWithProbability> {
-        return memoizedRollWithProbability.getOrPut(num) {
-            val rolls = rolledDiceIter(0, IntArray(M), num)
-            rolls.map { roll: IntArray ->
-                check(
-                    roll.sum() == num
-                ) { "Total num of rolls should be equal to $num : ${roll.contentToString()}" }
-                var p = 1.0
-                var n = num
-                for (c in roll) {
-                    if (c == 0) continue
-                    p *= ncr(n, c)
-                    n -= c
-                }
-                p /= M.toDouble().pow(num.toDouble())
-                RollWithProbability(roll, p)
+        val rolls = rolledDiceIter(0, IntArray(M), num)
+        return rolls.map { roll: IntArray ->
+            check(
+                roll.sum() == num
+            ) { "Total num of rolls should be equal to $num : ${roll.contentToString()}" }
+            var p = 1.0
+            var n = num
+            for (c in roll) {
+                if (c == 0) continue
+                p *= ncr(n, c)
+                n -= c
             }
+            p /= M.toDouble().pow(num.toDouble())
+            RollWithProbability(roll, p)
         }
     }
 
@@ -180,22 +218,13 @@ class OptimizedStrategy {
 private val UPPER_SECTION_CATEGORIES = EnumSet.range(Category.ACES, Category.SIXES)
 
 enum class Category {
-    ACES,
-    TWOS,
-    THREES,
-    FOURS,
-    FIVES,
-    SIXES,
-    THREE_OF_A_KIND,
-    FOUR_OF_A_KIND,
-    FULL_HOUSE,
-    SMALL_STRAIGHT,
-    LARGE_STRAIGHT,
-    YACHT,
-    CHANCE;
+    ACES, TWOS, THREES, FOURS, FIVES, SIXES, THREE_OF_A_KIND, FOUR_OF_A_KIND, FULL_HOUSE, SMALL_STRAIGHT, LARGE_STRAIGHT, YACHT, CHANCE;
 
     fun score(rolledDice: IntArray): Int {
-        assert(rolledDice.size == M && Arrays.stream(rolledDice).sum() == N)
+        check(
+            rolledDice.size == M && rolledDice.sum() == N
+        ) { "The distribution is not as expected: ${rolledDice.contentToString()}" }
+
         return when (this) {
             ACES -> rolledDice[0] * 1
             TWOS -> rolledDice[1] * 2
@@ -297,22 +326,5 @@ private data class BetweenTurnsState(
         require(upperScoreLevel in 0..UPPER_BONUS_MIN) {
             "Invalid upper score level: $upperScoreLevel"
         }
-    }
-}
-
-private data class WithinTurnState(
-    val availableCategories: Set<Category>,
-    val upperScoreLevel: Int,
-    val numRollsRemaining: Int,
-    val rolledDice: Roll,
-) {
-    init {
-        require(isValid(numRollsRemaining, rolledDice.dist)) {
-            "Invalid arguments: numRollsRemaining=$numRollsRemaining, rolledDice=$rolledDice"
-        }
-    }
-
-    private fun isValid(numRollsRemaining: Int, rolledDiceDist: IntArray): Boolean {
-        return rolledDiceDist.size == M && if (numRollsRemaining == R) rolledDiceDist.all { it == 0 } else rolledDiceDist.sum() == N
     }
 }
