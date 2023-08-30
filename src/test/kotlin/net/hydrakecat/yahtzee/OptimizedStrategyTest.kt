@@ -205,11 +205,12 @@ class OptimizedStrategyTest {
 //        )
 //        assertThat(actual).isEqualTo(139.97129244237908)
 //    }
-//    @Test
-//    fun computeExpectedScore_allSectionsAvailable() {
-//        val actual = strategy.computeExpectedScore(13)
-//        assertThat(actual).isEqualTo(245.87)
-//    }
+
+    @Test
+    fun computeExpectedScore_allSectionsAvailable() {
+        val actual = strategy.computeExpectedScore(13)
+        assertThat(actual).isEqualTo(245.8707745141113)
+    }
 }
 
 private fun wrapIntArrayOf(vararg elements: Int) = intArrayOf(*elements).wrap()
