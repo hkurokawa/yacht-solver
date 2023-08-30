@@ -50,10 +50,16 @@ class OptimizedStrategy {
     }
 
     fun computeExpectedScore(
-        availableCategories: Set<Category>,
-        upperScoreLevel: Int,
+        numAvailableFirstCategories: Int
     ): Double {
-        return computeExpectedScore(BetweenTurnsState(availableCategories, upperScoreLevel))
+        return computeExpectedScore(
+            BetweenTurnsState(
+                EnumSet.range(
+                    Category.ACES,
+                    Category.entries[numAvailableFirstCategories - 1]
+                ), 0
+            )
+        )
     }
 
     private fun computeExpectedScore(state: BetweenTurnsState): Double {
@@ -94,8 +100,7 @@ class OptimizedStrategy {
                                     }
                                 }
                                 val score = scoreGained + computeExpectedScore(
-                                    categories - c,
-                                    expectedUpperScoreLevel,
+                                    BetweenTurnsState(categories - c, expectedUpperScoreLevel)
                                 )
                                 dp[0][i][j][k][l][m][n] = max(dp[0][i][j][k][l][m][n], score)
                             }
