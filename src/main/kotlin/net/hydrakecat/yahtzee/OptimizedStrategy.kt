@@ -31,8 +31,11 @@ class OptimizedStrategy {
     // Number of possible choices to keep from the ith distribution of N dices
     private val numChoices: IntArray
 
-    // The probability to transit from the ith distribution to the kth distribution when selecting the jth choice
-    private val trans: Array<Array<DoubleArray>>
+    // List of distributions of N dices from the ith distribution when choosing the jth choice
+    private val transDists: Array<Array<IntArray>>
+
+    // Probability to transit from the ith distribution to the kth distribution when choosing the jth choice
+    private val transDistProb: Array<Array<DoubleArray>>
 
     init {
         val numbersWithProbList = rolledDiceDist(N)
@@ -47,9 +50,12 @@ class OptimizedStrategy {
             numChoices[i] = chooseKeep(dists[i]).size
             C = max(C, numChoices[i])
         }
-        trans = Array(n) { Array(C) { DoubleArray(n) } }
+        transDists = Array(n) { Array(C) { IntArray(0) } }
+        transDistProb = Array(n) { Array(C) { DoubleArray(0) } }
         for (i in 0..<n) {
             chooseKeep(dists[i]).forEachIndexed { j, kept ->
+                val distList = mutableListOf<Int>()
+                val probList = mutableListOf<Double>()
                 // the jth choice is selected and we keep the dist of kept
                 for ((d, p) in rolledDiceDist(N - kept.sum())) {
                     val ns = merge(kept, d.dist)
@@ -59,8 +65,11 @@ class OptimizedStrategy {
                     if (k < 0) {
                         throw IllegalStateException("Dist ${ns.contentToString()} not found")
                     }
-                    trans[i][j][k] += p
+                    distList.add(k)
+                    probList.add(p)
                 }
+                transDists[i][j] = distList.toIntArray()
+                transDistProb[i][j] = probList.toDoubleArray()
             }
         }
     }
@@ -128,8 +137,8 @@ class OptimizedStrategy {
             for (i in dists.indices) {
                 repeat(numChoices[i]) { k ->
                     var score = 0.0
-                    for (j in dists.indices) {
-                        score += dp[next][j] * trans[i][k][j]
+                    for (j in transDists[i][k].indices) {
+                        score += dp[next][transDists[i][k][j]] * transDistProb[i][k][j]
                     }
                     dp[current][i] = max(dp[current][i], score)
                 }
