@@ -80,14 +80,14 @@ class OptimizedStrategy {
     ): Double {
         val s = N + 1
         val dp =
-            Array(R) { Array(s) { Array(s) { Array(s) { Array(s) { Array(s) { DoubleArray(s) } } } } } }
+            Array(2) { Array(s) { Array(s) { Array(s) { Array(s) { Array(s) { DoubleArray(s) } } } } } }
         for (i in 0..N) {
             for (j in 0..N - i) {
                 for (k in 0..N - i - j) {
                     for (l in 0..N - i - j - k) {
                         for (m in 0..N - i - j - k - l) {
                             val n = N - i - j - k - l - m
-                            dp[0][i][j][k][l][m][n] = 0.0
+                            dp[1][i][j][k][l][m][n] = 0.0
                             for (c in categories) {
                                 var scoreGained = c.score(intArrayOf(i, j, k, l, m, n))
                                 var expectedUpperScoreLevel = upperScoreLevel
@@ -102,14 +102,16 @@ class OptimizedStrategy {
                                 val score = scoreGained + computeExpectedScore(
                                     BetweenTurnsState(categories - c, expectedUpperScoreLevel)
                                 )
-                                dp[0][i][j][k][l][m][n] = max(dp[0][i][j][k][l][m][n], score)
+                                dp[1][i][j][k][l][m][n] = max(dp[1][i][j][k][l][m][n], score)
                             }
                         }
                     }
                 }
             }
         }
-        for (t in 1..<R) {
+        var current = 0
+        var next = 1
+        repeat(R - 1) {
             for (i in 0..N) {
                 for (j in 0..N - i) {
                     for (k in 0..N - i - j) {
@@ -120,20 +122,23 @@ class OptimizedStrategy {
                                     var score = 0.0
                                     for (rwp in rollsDistWithProbability[N - keep.sum()]) {
                                         val d = rwp.first.merge(keep)
-                                        score += dp[t - 1][d[0]][d[1]][d[2]][d[3]][d[4]][d[5]] * rwp.second
+                                        score += dp[next][d[0]][d[1]][d[2]][d[3]][d[4]][d[5]] * rwp.second
                                     }
-                                    dp[t][i][j][k][l][m][n] = max(dp[t][i][j][k][l][m][n], score)
+                                    dp[current][i][j][k][l][m][n] =
+                                        max(dp[current][i][j][k][l][m][n], score)
                                 }
                             }
                         }
                     }
                 }
             }
+            current = 1 - current
+            next = 1 - next
         }
         var e = 0.0
         for ((rolls, probability) in rolledDiceDist(N)) {
             val d = rolls.dist
-            e += dp[2][d[0]][d[1]][d[2]][d[3]][d[4]][d[5]] * probability
+            e += dp[next][d[0]][d[1]][d[2]][d[3]][d[4]][d[5]] * probability
         }
         return e
     }

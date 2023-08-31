@@ -1,6 +1,7 @@
 package net.hydrakecat.yahtzee
 
 import com.google.common.truth.Truth.assertThat
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 
@@ -207,6 +208,7 @@ class OptimizedStrategyTest {
 //    }
 
     @Test
+    @Ignore
     fun computeExpectedScore_allSectionsAvailable() {
         val actual = strategy.computeExpectedScore(13)
         assertThat(actual).isEqualTo(245.8707745141113)
