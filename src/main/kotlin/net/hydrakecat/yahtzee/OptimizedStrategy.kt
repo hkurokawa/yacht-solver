@@ -22,35 +22,55 @@ private const val UPPER_BONUS = 35
 class OptimizedStrategy {
     private val memoizedBetweenTurnsE = HashMap<BetweenTurnsState, Double>()
 
-    private val rollsDistWithProbability = Array(N + 1) { ArrayList<Pair<IntArray, Double>>() }
+    // List of possible number distribution when rolling N dices
+    private val dists: Array<IntArray>
 
-    private val rollsDistSubset =
-        Array(N + 1) { Array(N + 1) { Array(N + 1) { Array(N + 1) { Array(N + 1) { Array(N + 1) { ArrayList<IntArray>() } } } } } }
+    // Probability to see the ith distribution of numbers when rolling N dices
+    private val prob: DoubleArray
+
+    // Number of possible choices to keep from the ith distribution of N dices
+    private val numChoices: IntArray
+
+    // The probability to transit from the ith distribution to the kth distribution when selecting the jth choice
+    private val trans: Array<Array<DoubleArray>>
 
     init {
-        for (n in 0..N) {
-            for ((dist, probability) in rolledDiceDist(n)) {
-                rollsDistWithProbability[n].add(Pair(dist.dist, probability))
-            }
+        val numbersWithProbList = rolledDiceDist(N)
+        val n = numbersWithProbList.size
+        dists = Array(n) { IntArray(M) }
+        prob = DoubleArray(n)
+        numChoices = IntArray(n)
+        var C = 0
+        for (i in numbersWithProbList.indices) {
+            dists[i] = numbersWithProbList[i].roll.dist
+            prob[i] = numbersWithProbList[i].probability
+            numChoices[i] = chooseKeep(dists[i]).size
+            C = max(C, numChoices[i])
         }
-
-        for (i in 0..N) {
-            for (j in 0..N - i) {
-                for (k in 0..N - i - j) {
-                    for (l in 0..N - i - j - k) {
-                        for (m in 0..N - i - j - k - l) {
-                            val n = N - i - j - k - l - m
-                            val d = intArrayOf(i, j, k, l, m, n)
-                            rollsDistSubset[i][j][k][l][m][n].addAll(chooseKeep(d).filterNot {
-                                it.contentEquals(
-                                    intArrayOf(i, j, k, l, m, n)
-                                )
-                            })
-                        }
+        trans = Array(n) { Array(C) { DoubleArray(n) } }
+        for (i in 0..<n) {
+            chooseKeep(dists[i]).forEachIndexed { j, kept ->
+                // the jth choice is selected and we keep the dist of kept
+                for ((d, p) in rolledDiceDist(N - kept.sum())) {
+                    val ns = merge(kept, d.dist)
+                    val k = dists.indexOfFirst {
+                        it.contentEquals(ns)
                     }
+                    if (k < 0) {
+                        throw IllegalStateException("Dist ${ns.contentToString()} not found")
+                    }
+                    trans[i][j][k] += p
                 }
             }
         }
+    }
+
+    private fun merge(array: IntArray, other: IntArray): IntArray {
+        val r = array.copyOf()
+        for (i in r.indices) {
+            r[i] += other[i]
+        }
+        return r
     }
 
     fun computeExpectedScore(
@@ -82,91 +102,48 @@ class OptimizedStrategy {
         categories: Set<Category>,
         upperScoreLevel: Int,
     ): Double {
-        val s = N + 1
-        val dp =
-            Array(2) { Array(s) { Array(s) { Array(s) { Array(s) { Array(s) { DoubleArray(s) } } } } } }
-        for (i in 0..N) {
-            for (j in 0..N - i) {
-                for (k in 0..N - i - j) {
-                    for (l in 0..N - i - j - k) {
-                        for (m in 0..N - i - j - k - l) {
-                            val n = N - i - j - k - l - m
-                            dp[1][i][j][k][l][m][n] = 0.0
-                            for (c in categories) {
-                                var scoreGained = c.score(intArrayOf(i, j, k, l, m, n))
-                                var expectedUpperScoreLevel = upperScoreLevel
-                                if (UPPER_SECTION_CATEGORIES.contains(c)) {
-                                    expectedUpperScoreLevel += scoreGained
-                                    expectedUpperScoreLevel =
-                                        expectedUpperScoreLevel.coerceAtMost(UPPER_BONUS_MIN)
-                                    if (UPPER_BONUS_MIN in (upperScoreLevel + 1)..expectedUpperScoreLevel) {
-                                        scoreGained += UPPER_BONUS
-                                    }
-                                }
-                                val score = scoreGained + computeExpectedScore(
-                                    BetweenTurnsState(categories - c, expectedUpperScoreLevel)
-                                )
-                                dp[1][i][j][k][l][m][n] = max(dp[1][i][j][k][l][m][n], score)
-                            }
-                        }
+        val dp = Array(2) { DoubleArray(dists.size) }
+        for (i in dists.indices) {
+            dp[1][i] = 0.0
+            for (c in categories) {
+                var scoreGained = c.score(dists[i])
+                var nextUpperScoreLevel = upperScoreLevel
+                if (UPPER_SECTION_CATEGORIES.contains(c)) {
+                    nextUpperScoreLevel += scoreGained
+                    nextUpperScoreLevel = nextUpperScoreLevel.coerceAtMost(UPPER_BONUS_MIN)
+                    if (UPPER_BONUS_MIN in (upperScoreLevel + 1)..nextUpperScoreLevel) {
+                        scoreGained += UPPER_BONUS
                     }
                 }
+                val score = scoreGained + computeExpectedScore(
+                    BetweenTurnsState(categories - c, nextUpperScoreLevel)
+                )
+                dp[1][i] = max(dp[1][i], score)
             }
         }
         var current = 0
         var next = 1
         repeat(R - 1) {
-            for (i in 0..N) {
-                for (j in 0..N - i) {
-                    for (k in 0..N - i - j) {
-                        for (l in 0..N - i - j - k) {
-                            for (m in 0..N - i - j - k - l) {
-                                val n = N - i - j - k - l - m
-                                dp[current][i][j][k][l][m][n] = dp[next][i][j][k][l][m][n]
-                            }
-                        }
+            dp[current] = dp[next].copyOf()
+            for (i in dists.indices) {
+                repeat(numChoices[i]) { k ->
+                    var score = 0.0
+                    for (j in dists.indices) {
+                        score += dp[next][j] * trans[i][k][j]
                     }
-                }
-            }
-            for (i in 0..N) {
-                for (j in 0..N - i) {
-                    for (k in 0..N - i - j) {
-                        for (l in 0..N - i - j - k) {
-                            for (m in 0..N - i - j - k - l) {
-                                val n = N - i - j - k - l - m
-                                for (keep in rollsDistSubset[i][j][k][l][m][n]) {
-                                    var score = 0.0
-                                    for (rwp in rollsDistWithProbability[N - keep.sum()]) {
-                                        val d = rwp.first.merge(keep)
-                                        score += dp[next][d[0]][d[1]][d[2]][d[3]][d[4]][d[5]] * rwp.second
-                                    }
-                                    dp[current][i][j][k][l][m][n] =
-                                        max(dp[current][i][j][k][l][m][n], score)
-                                }
-                            }
-                        }
-                    }
+                    dp[current][i] = max(dp[current][i], score)
                 }
             }
             current = 1 - current
             next = 1 - next
         }
         var e = 0.0
-        for ((rolls, probability) in rolledDiceDist(N)) {
-            val d = rolls.dist
-            e += dp[next][d[0]][d[1]][d[2]][d[3]][d[4]][d[5]] * probability
+        for (i in dists.indices) {
+            e += dp[next][i] * prob[i]
         }
         return e
     }
 
-
-    private fun IntArray.merge(other: IntArray): IntArray {
-        val r = copyOf()
-        for (i in r.indices) {
-            r[i] += other[i]
-        }
-        return r
-    }
 
     // Returns all the possible dices to keep
     fun chooseKeep(rolledDiceDist: IntArray): List<IntArray> {
