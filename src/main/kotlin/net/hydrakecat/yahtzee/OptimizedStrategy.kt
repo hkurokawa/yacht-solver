@@ -41,7 +41,11 @@ class OptimizedStrategy {
                         for (m in 0..N - i - j - k - l) {
                             val n = N - i - j - k - l - m
                             val d = intArrayOf(i, j, k, l, m, n)
-                            rollsDistSubset[i][j][k][l][m][n].addAll(chooseKeep(d))
+                            rollsDistSubset[i][j][k][l][m][n].addAll(chooseKeep(d).filterNot {
+                                it.contentEquals(
+                                    intArrayOf(i, j, k, l, m, n)
+                                )
+                            })
                         }
                     }
                 }
@@ -112,6 +116,18 @@ class OptimizedStrategy {
         var current = 0
         var next = 1
         repeat(R - 1) {
+            for (i in 0..N) {
+                for (j in 0..N - i) {
+                    for (k in 0..N - i - j) {
+                        for (l in 0..N - i - j - k) {
+                            for (m in 0..N - i - j - k - l) {
+                                val n = N - i - j - k - l - m
+                                dp[current][i][j][k][l][m][n] = dp[next][i][j][k][l][m][n]
+                            }
+                        }
+                    }
+                }
+            }
             for (i in 0..N) {
                 for (j in 0..N - i) {
                     for (k in 0..N - i - j) {
