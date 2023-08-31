@@ -1,6 +1,13 @@
 package net.hydrakecat.yahtzee
 
+import java.io.PrintWriter
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.util.*
+import kotlin.io.path.exists
+import kotlin.io.path.notExists
+import kotlin.io.path.reader
+import kotlin.io.path.writer
 import kotlin.math.max
 import kotlin.math.pow
 
@@ -83,16 +90,78 @@ class OptimizedStrategy {
     }
 
     fun computeExpectedScore(
-        numAvailableFirstCategories: Int
+        numAvailableFirstCategories: Int,
+        fileName: String? = null,
     ): Double {
-        return computeExpectedScore(
-            BetweenTurnsState(
-                EnumSet.range(
-                    Category.ACES,
-                    Category.entries[numAvailableFirstCategories - 1]
-                ), 0
-            )
+        val availableCategories = EnumSet.range(
+            Category.ACES,
+            Category.entries[numAvailableFirstCategories - 1]
         )
+        return loadOrSaveExpectedScores(fileName) {
+            computeExpectedScore(BetweenTurnsState(availableCategories, 0))
+        }
+    }
+
+    private fun <T> loadOrSaveExpectedScores(
+        fileName: String?,
+        body: () -> T
+    ): T {
+        val availableCategories = Category.entries
+        if (fileName == null) return body()
+        val path = Path.of(fileName)
+        if (path.exists()) {
+            println("Loading from $fileName")
+            path.reader(options = arrayOf(StandardOpenOption.READ)).use { reader ->
+                val scanner = Scanner(reader)
+                var line: String
+                while (scanner.hasNextLine()) {
+                    line = scanner.nextLine()
+                    if (line.startsWith("#")) continue
+                    val numbers = line.split(Regex(" +"))
+                    val categories = Integer.parseInt(numbers[0], 2).toCategories()
+                    numbers.drop(1).forEachIndexed { us, s ->
+                        val d = s.toDouble()
+                        if (d.isFinite()) {
+                            memoizedBetweenTurnsE[BetweenTurnsState(categories, us)] = d
+                        }
+                    }
+                }
+            }
+        }
+        val result = body()
+        if (path.notExists()) {
+            println("Saving to $fileName")
+            path.writer(
+                options = arrayOf(
+                    StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE
+                )
+            ).use { writer ->
+                val printer = PrintWriter(writer)
+                printer.println("## N: $N, M: $M, R: $R")
+                printer.println("## Categories: $availableCategories")
+                printer.println("## Total upper section score to reach bonus: $UPPER_BONUS_MIN")
+                for (c in 0..<(1 shl availableCategories.size)) {
+                    printer.print(
+                        String.format(
+                            "%${availableCategories.size}s",
+                            Integer.toBinaryString(c)
+                        ).replace(" ", "0")
+                    )
+                    for (us in 0..UPPER_BONUS_MIN) {
+                        val categories = c.toCategories()
+                        val d = memoizedBetweenTurnsE[BetweenTurnsState(categories, us)]
+                        if (d == null) {
+                            printer.printf(" %21s", Double.NaN)
+                        } else {
+                            printer.printf(" %21.17f", d)
+                        }
+                    }
+                    printer.println()
+                }
+            }
+        }
+        return result
     }
 
     private fun computeExpectedScore(state: BetweenTurnsState): Double {
@@ -225,6 +294,22 @@ class OptimizedStrategy {
         }
         return list
     }
+}
+
+private fun Int.toCategories(): Set<Category> {
+    var c = this
+    val r = mutableSetOf<Category>()
+    while (c != 0) {
+        var lsb = c.takeLowestOneBit()
+        c = c xor lsb
+        var i = -1
+        while (lsb > 0) {
+            lsb = lsb shr 1
+            i++
+        }
+        r.add(Category.entries[i])
+    }
+    return r
 }
 
 private val UPPER_SECTION_CATEGORIES = EnumSet.range(Category.ACES, Category.SIXES)
