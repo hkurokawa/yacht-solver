@@ -10,62 +10,62 @@ class OptimizedStrategyTest {
 
     @Test
     fun score_threeOfAKind_12224_returns11() {
-        assertThat(Category.THREE_OF_A_KIND.score(intArrayOf(1, 3, 0, 1, 0, 0))).isEqualTo(11)
+        assertThat(Category.THREE_OF_A_KIND.scoreDist(intArrayOf(1, 3, 0, 1, 0, 0))).isEqualTo(11)
     }
 
     @Test
     fun score_threeOfAKind_12256_returns0() {
-        assertThat(Category.THREE_OF_A_KIND.score(intArrayOf(1, 2, 0, 0, 1, 1))).isEqualTo(0)
+        assertThat(Category.THREE_OF_A_KIND.scoreDist(intArrayOf(1, 2, 0, 0, 1, 1))).isEqualTo(0)
     }
 
     @Test
     fun score_fourOfAKind_55556_returns26() {
-        assertThat(Category.FOUR_OF_A_KIND.score(intArrayOf(0, 0, 0, 0, 4, 1))).isEqualTo(26)
+        assertThat(Category.FOUR_OF_A_KIND.scoreDist(intArrayOf(0, 0, 0, 0, 4, 1))).isEqualTo(26)
     }
 
     @Test
     fun score_fourOfAKind_44466_returns0() {
-        assertThat(Category.FOUR_OF_A_KIND.score(intArrayOf(0, 0, 0, 3, 0, 2))).isEqualTo(0)
+        assertThat(Category.FOUR_OF_A_KIND.scoreDist(intArrayOf(0, 0, 0, 3, 0, 2))).isEqualTo(0)
     }
 
     @Test
     fun score_fullHouse_44466_returns25() {
-        assertThat(Category.FULL_HOUSE.score(intArrayOf(0, 0, 0, 3, 0, 2))).isEqualTo(25)
+        assertThat(Category.FULL_HOUSE.scoreDist(intArrayOf(0, 0, 0, 3, 0, 2))).isEqualTo(25)
     }
 
     @Test
     fun score_fullHouse_11366_returns0() {
-        assertThat(Category.FULL_HOUSE.score(intArrayOf(2, 0, 1, 0, 0, 2))).isEqualTo(0)
+        assertThat(Category.FULL_HOUSE.scoreDist(intArrayOf(2, 0, 1, 0, 0, 2))).isEqualTo(0)
     }
 
     @Test
     fun score_smallStraight_23345_returns30() {
-        assertThat(Category.SMALL_STRAIGHT.score(intArrayOf(0, 1, 2, 1, 1, 0))).isEqualTo(30)
+        assertThat(Category.SMALL_STRAIGHT.scoreDist(intArrayOf(0, 1, 2, 1, 1, 0))).isEqualTo(30)
     }
 
     @Test
     fun score_smallStraight_12356_returns0() {
-        assertThat(Category.SMALL_STRAIGHT.score(intArrayOf(1, 1, 1, 0, 1, 1))).isEqualTo(0)
+        assertThat(Category.SMALL_STRAIGHT.scoreDist(intArrayOf(1, 1, 1, 0, 1, 1))).isEqualTo(0)
     }
 
     @Test
     fun score_largeStraight_23456_returns40() {
-        assertThat(Category.LARGE_STRAIGHT.score(intArrayOf(0, 1, 1, 1, 1, 1))).isEqualTo(40)
+        assertThat(Category.LARGE_STRAIGHT.scoreDist(intArrayOf(0, 1, 1, 1, 1, 1))).isEqualTo(40)
     }
 
     @Test
     fun score_largeStraight_12344_returns0() {
-        assertThat(Category.LARGE_STRAIGHT.score(intArrayOf(1, 1, 1, 2, 0, 0))).isEqualTo(0)
+        assertThat(Category.LARGE_STRAIGHT.scoreDist(intArrayOf(1, 1, 1, 2, 0, 0))).isEqualTo(0)
     }
 
     @Test
     fun score_yacht_22222_returns50() {
-        assertThat(Category.YACHT.score(intArrayOf(0, 5, 0, 0, 0, 0))).isEqualTo(50)
+        assertThat(Category.YACHT.scoreDist(intArrayOf(0, 5, 0, 0, 0, 0))).isEqualTo(50)
     }
 
     @Test
     fun score_yacht_12222_returns0() {
-        assertThat(Category.YACHT.score(intArrayOf(1, 4, 0, 0, 0, 0))).isEqualTo(0)
+        assertThat(Category.YACHT.scoreDist(intArrayOf(1, 4, 0, 0, 0, 0))).isEqualTo(0)
     }
 
     @Test

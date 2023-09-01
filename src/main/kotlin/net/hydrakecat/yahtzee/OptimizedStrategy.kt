@@ -22,9 +22,9 @@ private const val M = 6
 private const val R = 3
 
 // Upper section bonus criteria
-private const val UPPER_BONUS_MIN = 63
+const val UPPER_BONUS_MIN = 63
 
-private const val UPPER_BONUS = 35
+const val UPPER_BONUS = 35
 
 class OptimizedStrategy {
     private val memoizedBetweenTurnsE = HashMap<BetweenTurnsState, Double>()
@@ -35,10 +35,13 @@ class OptimizedStrategy {
     // Probability to see the ith distribution of numbers when rolling N dices
     private val prob: DoubleArray
 
-    // Number of possible choices to keep from the ith distribution of N dices
+    // Number of possible choices to keep when the ith distribution of N dices is given
     private val numChoices: IntArray
 
-    // List of distributions of N dices from the ith distribution when choosing the jth choice
+    // List of distributions of dices that is chosen when the ith distribution is given and the jth choice is selected
+    private val choice: Array<Array<IntArray>>
+
+    // List of distributions of N dices that could be derived from the ith distribution when choosing the jth choice
     private val transDists: Array<Array<IntArray>>
 
     // Probability to transit from the ith distribution to the kth distribution when choosing the jth choice
@@ -59,8 +62,10 @@ class OptimizedStrategy {
         }
         transDists = Array(n) { Array(C) { IntArray(0) } }
         transDistProb = Array(n) { Array(C) { DoubleArray(0) } }
+        choice = Array(n) { Array(C) { IntArray(0) } }
         for (i in 0..<n) {
             chooseKeep(dists[i]).forEachIndexed { j, kept ->
+                choice[i][j] = kept
                 val distList = mutableListOf<Int>()
                 val probList = mutableListOf<Double>()
                 // the jth choice is selected and we keep the dist of kept
@@ -89,25 +94,54 @@ class OptimizedStrategy {
         return r
     }
 
-    fun computeExpectedScore(
-        numAvailableFirstCategories: Int,
-        fileName: String? = null,
-    ): Double {
+    fun computeExpectedScore(numAvailableFirstCategories: Int): Double {
         val availableCategories = EnumSet.range(
             Category.ACES,
             Category.entries[numAvailableFirstCategories - 1]
         )
-        return loadOrSaveExpectedScores(fileName) {
-            computeExpectedScore(BetweenTurnsState(availableCategories, 0))
+        return computeExpectedScore(BetweenTurnsState(availableCategories, 0))
+    }
+
+    fun save(fileName: String?) {
+        if (fileName == null) return
+        val categories = Category.entries
+        computeExpectedScore(categories.size)
+        val path = Path.of(fileName)
+        if (path.notExists()) {
+            println("Saving to $fileName")
+            path.writer(
+                options = arrayOf(
+                    StandardOpenOption.CREATE_NEW,
+                    StandardOpenOption.WRITE
+                )
+            ).use { writer ->
+                val printer = PrintWriter(writer)
+                printer.println("## N: $N, M: $M, R: $R")
+                printer.println("## Categories: $categories")
+                printer.println("## Total upper section score to reach bonus: $UPPER_BONUS_MIN")
+                for (c in 0..<(1 shl categories.size)) {
+                    printer.print(
+                        String.format(
+                            "%${categories.size}s",
+                            Integer.toBinaryString(c)
+                        ).replace(" ", "0")
+                    )
+                    for (us in 0..UPPER_BONUS_MIN) {
+                        val d = memoizedBetweenTurnsE[BetweenTurnsState(c.toCategories(), us)]
+                        if (d == null) {
+                            printer.printf(" %21s", Double.NaN)
+                        } else {
+                            printer.printf(" %21.17f", d)
+                        }
+                    }
+                    printer.println()
+                }
+            }
         }
     }
 
-    private fun <T> loadOrSaveExpectedScores(
-        fileName: String?,
-        body: () -> T
-    ): T {
-        val availableCategories = Category.entries
-        if (fileName == null) return body()
+    fun load(fileName: String?) {
+        if (fileName == null) return
         val path = Path.of(fileName)
         if (path.exists()) {
             println("Loading from $fileName")
@@ -128,40 +162,6 @@ class OptimizedStrategy {
                 }
             }
         }
-        val result = body()
-        if (path.notExists()) {
-            println("Saving to $fileName")
-            path.writer(
-                options = arrayOf(
-                    StandardOpenOption.CREATE_NEW,
-                    StandardOpenOption.WRITE
-                )
-            ).use { writer ->
-                val printer = PrintWriter(writer)
-                printer.println("## N: $N, M: $M, R: $R")
-                printer.println("## Categories: $availableCategories")
-                printer.println("## Total upper section score to reach bonus: $UPPER_BONUS_MIN")
-                for (c in 0..<(1 shl availableCategories.size)) {
-                    printer.print(
-                        String.format(
-                            "%${availableCategories.size}s",
-                            Integer.toBinaryString(c)
-                        ).replace(" ", "0")
-                    )
-                    for (us in 0..UPPER_BONUS_MIN) {
-                        val categories = c.toCategories()
-                        val d = memoizedBetweenTurnsE[BetweenTurnsState(categories, us)]
-                        if (d == null) {
-                            printer.printf(" %21s", Double.NaN)
-                        } else {
-                            printer.printf(" %21.17f", d)
-                        }
-                    }
-                    printer.println()
-                }
-            }
-        }
-        return result
     }
 
     private fun computeExpectedScore(state: BetweenTurnsState): Double {
@@ -176,27 +176,18 @@ class OptimizedStrategy {
         }
     }
 
+    // Returns the expected score when [categories] are available and upper section total score level (0 - UPPER_BONUS_MIN).
     private fun computeWithinTurnExpectedScore(
         categories: Set<Category>,
-        upperScoreLevel: Int,
+        usl: Int,
     ): Double {
         val dp = Array(2) { DoubleArray(dists.size) }
         for (i in dists.indices) {
             dp[1][i] = 0.0
             for (c in categories) {
-                var scoreGained = c.score(dists[i])
-                var nextUpperScoreLevel = upperScoreLevel
-                if (UPPER_SECTION_CATEGORIES.contains(c)) {
-                    nextUpperScoreLevel += scoreGained
-                    nextUpperScoreLevel = nextUpperScoreLevel.coerceAtMost(UPPER_BONUS_MIN)
-                    if (UPPER_BONUS_MIN in (upperScoreLevel + 1)..nextUpperScoreLevel) {
-                        scoreGained += UPPER_BONUS
-                    }
-                }
-                val score = scoreGained + computeExpectedScore(
-                    BetweenTurnsState(categories - c, nextUpperScoreLevel)
+                dp[1][i] = max(
+                    dp[1][i], scoreIfChoose(categories, usl, dists[i], c)
                 )
-                dp[1][i] = max(dp[1][i], score)
             }
         }
         var current = 0
@@ -222,6 +213,96 @@ class OptimizedStrategy {
         return e
     }
 
+    // Returns the expected score if choosing [category] when the dice number distribution is [dist]
+    private fun scoreIfChoose(
+        availableCategories: Set<Category>,
+        usl: Int,
+        dist: IntArray,
+        category: Category,
+    ): Double {
+        var scoreDelta = category.scoreDist(dist)
+        var newUsl = usl
+        if (UPPER_SECTION_CATEGORIES.contains(category)) {
+            newUsl += scoreDelta
+            newUsl = newUsl.coerceAtMost(UPPER_BONUS_MIN)
+            if (UPPER_BONUS_MIN in (usl + 1)..newUsl) {
+                scoreDelta += UPPER_BONUS
+            }
+        }
+        return scoreDelta + computeExpectedScore(
+            BetweenTurnsState(availableCategories - category, newUsl)
+        )
+    }
+
+    // For the given board, returns the best [n] choice
+    fun chooseBest(
+        n: Int,
+        categories: Set<Category>,
+        upperTotalScore: Int,
+        numRemainRolls: Int,
+        faces: IntArray,
+    ): List<Choice> {
+        check(categories.isNotEmpty()) { "No categories available" }
+        check(upperTotalScore in 0..105) { "Invalid upper section total score must be in [0, 105]: $upperTotalScore" }
+        check(numRemainRolls in 0..R) { "Invalid number of remaining rolls: $R" }
+        check(faces.size == N && faces.all { it in 1..M }) { "Invalid faces: ${faces.contentToString()}" }
+
+        val dist = faces.toDist()
+        val usl = upperTotalScore.coerceAtMost(
+            UPPER_BONUS_MIN
+        )
+        if (numRemainRolls == 0) {
+            return categories.map { c ->
+                Pair(c, scoreIfChoose(categories, usl, dist, c))
+            }.sortedByDescending { it.second }.take(n).map { Choice.Select(it.first, it.second) }
+        }
+        val dp = Array(2) { DoubleArray(dists.size) }
+        for (i in dists.indices) {
+            dp[1][i] = 0.0
+            for (c in categories) {
+                dp[1][i] = max(
+                    dp[1][i], scoreIfChoose(categories, usl, dists[i], c)
+                )
+            }
+        }
+        var current = 0
+        var next = 1
+        repeat(numRemainRolls - 1) {
+            dp[current] = dp[next].copyOf()
+            for (i in dists.indices) {
+                repeat(numChoices[i]) { k ->
+                    var score = 0.0
+                    for (j in transDists[i][k].indices) {
+                        score += dp[next][transDists[i][k][j]] * transDistProb[i][k][j]
+                    }
+                    dp[current][i] = max(dp[current][i], score)
+                }
+            }
+            current = 1 - current
+            next = 1 - next
+        }
+
+        // Find the optimal keep for the given distribution
+        val i = dists.indexOfFirst { it.contentEquals(dist) }
+        // We have an option to keep all so prepend that option
+        val keptScorePairs = (0..<numChoices[i]).map { k ->
+            var score = 0.0
+            for (j in transDists[i][k].indices) {
+                score += dp[next][transDists[i][k][j]] * transDistProb[i][k][j]
+            }
+            Pair(choice[i][k], score)
+        }
+        return (listOf(Pair(dist, dp[next][i])) + keptScorePairs).sortedByDescending { it.second }
+            .take(n).map { (k, score) ->
+                if (k.contentEquals(dist)) {
+                    // Keeping all the dices mean we want to select the Category here
+                    val category = categories.maxBy { scoreIfChoose(categories, usl, dist, it) }
+                    Choice.Select(category, score)
+                } else {
+                    Choice.Keep(k.toFaces().toList(), score)
+                }
+            }
+    }
 
     // Returns all the possible dices to keep
     fun chooseKeep(rolledDiceDist: IntArray): List<IntArray> {
@@ -296,6 +377,21 @@ class OptimizedStrategy {
     }
 }
 
+// From dist to faces
+private fun IntArray.toFaces(): IntArray {
+    return flatMapIndexed { num, freq ->
+        List(freq) { num + 1 }
+    }.sorted().toIntArray()
+}
+
+
+// From faces to dist
+private fun IntArray.toDist(): IntArray {
+    return IntArray(M) { num ->
+        this.count { it == num + 1 }
+    }
+}
+
 private fun Int.toCategories(): Set<Category> {
     var c = this
     val r = mutableSetOf<Category>()
@@ -317,54 +413,58 @@ private val UPPER_SECTION_CATEGORIES = EnumSet.range(Category.ACES, Category.SIX
 enum class Category {
     ACES, TWOS, THREES, FOURS, FIVES, SIXES, THREE_OF_A_KIND, FOUR_OF_A_KIND, FULL_HOUSE, SMALL_STRAIGHT, LARGE_STRAIGHT, YACHT, CHANCE;
 
-    fun score(rolledDice: IntArray): Int {
+    fun score(faces: IntArray): Int {
+        return scoreDist(faces.toDist())
+    }
+
+    fun scoreDist(diceDist: IntArray): Int {
         check(
-            rolledDice.size == M && rolledDice.sum() == N
-        ) { "The distribution is not as expected: ${rolledDice.contentToString()}" }
+            diceDist.size == M && diceDist.sum() == N
+        ) { "The distribution is not as expected: ${diceDist.contentToString()}" }
 
         return when (this) {
-            ACES -> rolledDice[0] * 1
-            TWOS -> rolledDice[1] * 2
-            THREES -> rolledDice[2] * 3
-            FOURS -> rolledDice[3] * 4
-            FIVES -> rolledDice[4] * 5
-            SIXES -> rolledDice[5] * 6
+            ACES -> diceDist[0] * 1
+            TWOS -> diceDist[1] * 2
+            THREES -> diceDist[2] * 3
+            FOURS -> diceDist[3] * 4
+            FIVES -> diceDist[4] * 5
+            SIXES -> diceDist[5] * 6
             THREE_OF_A_KIND -> {
-                if (rolledDice.any { it >= 3 }) {
-                    rolledDice.computeSumFaces()
+                if (diceDist.any { it >= 3 }) {
+                    diceDist.computeSumFaces()
                 } else 0
             }
 
             FOUR_OF_A_KIND -> {
-                if (rolledDice.any { it >= 4 }) {
-                    rolledDice.computeSumFaces()
+                if (diceDist.any { it >= 4 }) {
+                    diceDist.computeSumFaces()
                 } else 0
             }
 
             FULL_HOUSE -> {
-                if (rolledDice.count { it >= 2 } == 2 && rolledDice.count { it == 0 } == M - 2) {
+                if (diceDist.count { it >= 2 } == 2 && diceDist.count { it == 0 } == M - 2) {
                     25
                 } else 0
             }
 
             SMALL_STRAIGHT -> {
-                for (i in 0..2) if (rolledDice.slice(i..i + 3).all { it > 0 }) return 30
+                for (i in 0..2) if (diceDist.slice(i..i + 3).all { it > 0 }) return 30
                 0
             }
 
             LARGE_STRAIGHT -> {
                 for (i in 0..1) {
-                    if (rolledDice.slice(i..i + 4).all { it > 0 }) return 40
+                    if (diceDist.slice(i..i + 4).all { it > 0 }) return 40
                 }
                 0
             }
 
             YACHT -> {
-                if (rolledDice.any { it >= N }) 50 else 0
+                if (diceDist.any { it >= N }) 50 else 0
             }
 
             CHANCE -> {
-                rolledDice.computeSumFaces()
+                diceDist.computeSumFaces()
             }
         }
     }
@@ -424,4 +524,10 @@ private data class BetweenTurnsState(
             "Invalid upper score level: $upperScoreLevel"
         }
     }
+}
+
+sealed interface Choice {
+    data class Keep(val dices: List<Int>, val expect: Double) : Choice
+
+    data class Select(val category: Category, val expect: Double) : Choice
 }
