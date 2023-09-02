@@ -13,13 +13,13 @@ import kotlin.math.pow
 
 
 // Number of dices
-private const val N = 5
+const val N = 5
 
 // Num faces of the dice
-private const val M = 6
+const val M = 6
 
 // Num rolls in a turn
-private const val R = 3
+const val R = 3
 
 // Upper section bonus criteria
 const val UPPER_BONUS_MIN = 63
