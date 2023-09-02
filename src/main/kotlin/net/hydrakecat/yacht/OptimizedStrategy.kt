@@ -1,4 +1,4 @@
-package net.hydrakecat.yahtzee
+package net.hydrakecat.yacht
 
 import java.io.PrintWriter
 import java.nio.file.Path

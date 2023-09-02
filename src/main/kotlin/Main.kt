@@ -1,4 +1,4 @@
-import net.hydrakecat.yahtzee.*
+import net.hydrakecat.yacht.*
 import java.util.*
 
 fun main() {

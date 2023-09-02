@@ -1,4 +1,4 @@
-package net.hydrakecat.yahtzee
+package net.hydrakecat.yacht
 
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.Ignore
