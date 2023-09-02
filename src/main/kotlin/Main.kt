@@ -7,8 +7,8 @@ fun main() {
 
     val n = 3
     val board = Board()
-//    auto(strategy, n, board)
-    manual(strategy, n, board)
+    auto(strategy, n, board)
+//    manual(strategy, n, board)
     println()
     println("[Final Result]")
     println(board)
@@ -163,7 +163,7 @@ private data class Board(
             result.append(String.format("%15s %3d%n", c, scores[c]))
         }
         result.append(String.format("%15s %3d (%3d)%n", "US", bonus, sumUpperSectionScore()))
-        for (c in EnumSet.range(Category.THREE_OF_A_KIND, Category.CHANCE)) {
+        for (c in EnumSet.complementOf(EnumSet.range(Category.ACES, Category.SIXES))) {
             result.append(String.format("%15s %3d%n", c, scores[c]))
         }
         result.append(String.format("\n%15s %3d%n", "Total Score", totalScore()))

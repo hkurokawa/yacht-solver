@@ -1,22 +1,11 @@
 package net.hydrakecat.yacht
 
 import com.google.common.truth.Truth.assertThat
-import kotlin.test.Ignore
 import kotlin.test.Test
 
 
 class OptimizedStrategyTest {
     private val strategy = OptimizedStrategy()
-
-    @Test
-    fun score_threeOfAKind_12224_returns11() {
-        assertThat(Category.THREE_OF_A_KIND.scoreDist(intArrayOf(1, 3, 0, 1, 0, 0))).isEqualTo(11)
-    }
-
-    @Test
-    fun score_threeOfAKind_12256_returns0() {
-        assertThat(Category.THREE_OF_A_KIND.scoreDist(intArrayOf(1, 2, 0, 0, 1, 1))).isEqualTo(0)
-    }
 
     @Test
     fun score_fourOfAKind_55556_returns26() {
@@ -29,8 +18,8 @@ class OptimizedStrategyTest {
     }
 
     @Test
-    fun score_fullHouse_44466_returns25() {
-        assertThat(Category.FULL_HOUSE.scoreDist(intArrayOf(0, 0, 0, 3, 0, 2))).isEqualTo(25)
+    fun score_fullHouse_44466_returns24() {
+        assertThat(Category.FULL_HOUSE.scoreDist(intArrayOf(0, 0, 0, 3, 0, 2))).isEqualTo(24)
     }
 
     @Test
@@ -39,8 +28,8 @@ class OptimizedStrategyTest {
     }
 
     @Test
-    fun score_smallStraight_23345_returns30() {
-        assertThat(Category.SMALL_STRAIGHT.scoreDist(intArrayOf(0, 1, 2, 1, 1, 0))).isEqualTo(30)
+    fun score_smallStraight_23345_returns15() {
+        assertThat(Category.SMALL_STRAIGHT.scoreDist(intArrayOf(0, 1, 2, 1, 1, 0))).isEqualTo(15)
     }
 
     @Test
@@ -49,8 +38,8 @@ class OptimizedStrategyTest {
     }
 
     @Test
-    fun score_largeStraight_23456_returns40() {
-        assertThat(Category.LARGE_STRAIGHT.scoreDist(intArrayOf(0, 1, 1, 1, 1, 1))).isEqualTo(40)
+    fun score_largeStraight_23456_returns30() {
+        assertThat(Category.LARGE_STRAIGHT.scoreDist(intArrayOf(0, 1, 1, 1, 1, 1))).isEqualTo(30)
     }
 
     @Test
@@ -208,10 +197,9 @@ class OptimizedStrategyTest {
 //    }
 
     @Test
-    @Ignore
     fun computeExpectedScore_allSectionsAvailable() {
-        val actual = strategy.computeExpectedScore(13)
-        assertThat(actual).isEqualTo(245.8707745141113)
+        val actual = strategy.computeExpectedScore(Category.entries.size)
+        assertThat(actual).isEqualTo(191.76087975216507)
     }
 }
 
