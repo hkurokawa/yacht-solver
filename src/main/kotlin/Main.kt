@@ -1,14 +1,22 @@
 import net.hydrakecat.yacht.*
 import java.util.*
 
-fun main() {
+fun main(args: Array<String>) {
     val strategy = OptimizedStrategy()
-    strategy.load("expected_scores.txt")
-
+    val method = args.getOrNull(0) ?: "auto"
+    if (method == "save") {
+        strategy.save(args.getOrNull(1) ?: DEFAULT_FILE_NAME)
+        return
+    }
+    strategy.load(args.getOrNull(1) ?: DEFAULT_FILE_NAME)
     val n = 3
     val board = Board()
-    auto(strategy, n, board)
-//    manual(strategy, n, board)
+    when(method) {
+        "auto" -> auto(strategy, n, board)
+        "manual" -> manual(strategy, n, board)
+        else -> throw IllegalArgumentException("Unexpected method name: $method")
+    }
+
     println()
     println("[Final Result]")
     println(board)
@@ -170,3 +178,5 @@ private data class Board(
         return result.toString()
     }
 }
+
+private const val DEFAULT_FILE_NAME = "expected_scores.txt"
