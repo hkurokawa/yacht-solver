@@ -284,7 +284,6 @@ class OptimizedStrategy {
 
         // Find the optimal keep for the given distribution
         val i = dists.indexOfFirst { it.contentEquals(dist) }
-        // We have an option to keep all so prepend that option
         val keptScorePairs = (0..<numChoices[i]).map { k ->
             var score = 0.0
             for (j in transDists[i][k].indices) {
@@ -292,7 +291,7 @@ class OptimizedStrategy {
             }
             Pair(choice[i][k], score)
         }
-        return (listOf(Pair(dist, dp[next][i])) + keptScorePairs).sortedByDescending { it.second }
+        return keptScorePairs.sortedByDescending { it.second }
             .take(n).map { (k, score) ->
                 if (k.contentEquals(dist)) {
                     // Keeping all the dices mean we want to select the Category here
