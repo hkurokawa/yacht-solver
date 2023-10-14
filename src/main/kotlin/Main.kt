@@ -2,6 +2,9 @@ import net.hydrakecat.yacht.*
 import java.util.*
 
 fun main(args: Array<String>) {
+    if (args.isEmpty()) {
+        throw IllegalArgumentException("Usage: java -jar <jar file> save|auto|manual <file name>")
+    }
     val strategy = OptimizedStrategy()
     val method = args.getOrNull(0) ?: "auto"
     if (method == "save") {
