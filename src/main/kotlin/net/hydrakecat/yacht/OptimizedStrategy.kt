@@ -2,6 +2,7 @@ package net.hydrakecat.yacht
 
 import net.hydrakecat.yacht.DiceDistCalculator.rolledDiceDist
 import net.hydrakecat.yacht.DiceDistSubsetEnumerator.listSubsets
+import net.hydrakecat.yacht.ScoreCalculator.calculateScore
 import java.io.PrintWriter
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -223,16 +224,9 @@ class OptimizedStrategy {
         dist: IntArray,
         category: Category,
     ): Double {
-        var scoreDelta = category.scoreDist(dist)
-        var newUsl = usl
-        if (UPPER_SECTION_CATEGORIES.contains(category)) {
-            newUsl += scoreDelta
-            newUsl = newUsl.coerceAtMost(UPPER_BONUS_MIN)
-            if (UPPER_BONUS_MIN in (usl + 1)..newUsl) {
-                scoreDelta += UPPER_BONUS
-            }
-        }
-        return scoreDelta + computeExpectedScore(
+        var (score, bonus, newUsl) = calculateScore(category, dist, usl)
+        newUsl = newUsl.coerceAtMost(UPPER_BONUS_MIN)
+        return score + bonus + computeExpectedScore(
             BetweenTurnsState(availableCategories - category, newUsl)
         )
     }
@@ -336,68 +330,6 @@ private fun Int.toCategories(): Set<Category> {
         r.add(Category.entries[i])
     }
     return r
-}
-
-private val UPPER_SECTION_CATEGORIES = EnumSet.range(Category.ACES, Category.SIXES)
-
-enum class Category {
-    ACES, TWOS, THREES, FOURS, FIVES, SIXES, FOUR_OF_A_KIND, FULL_HOUSE, SMALL_STRAIGHT, LARGE_STRAIGHT, YACHT, CHANCE;
-
-    fun score(faces: IntArray): Int {
-        return scoreDist(faces.toDist())
-    }
-
-    fun scoreDist(diceDist: IntArray): Int {
-        check(
-            diceDist.size == M && diceDist.sum() == N
-        ) { "The distribution is not as expected: ${diceDist.contentToString()}" }
-
-        return when (this) {
-            ACES -> diceDist[0] * 1
-            TWOS -> diceDist[1] * 2
-            THREES -> diceDist[2] * 3
-            FOURS -> diceDist[3] * 4
-            FIVES -> diceDist[4] * 5
-            SIXES -> diceDist[5] * 6
-
-            FOUR_OF_A_KIND -> {
-                if (diceDist.any { it >= 4 }) {
-                    diceDist.computeSumFaces()
-                } else 0
-            }
-
-            FULL_HOUSE -> {
-                if (diceDist.count { it >= 2 } == 2 && diceDist.count { it == 0 } == M - 2) {
-                    diceDist.computeSumFaces()
-                } else 0
-            }
-
-            SMALL_STRAIGHT -> {
-                for (i in 0..2) if (diceDist.slice(i..i + 3).all { it > 0 }) return 15
-                0
-            }
-
-            LARGE_STRAIGHT -> {
-                for (i in 0..1) {
-                    if (diceDist.slice(i..i + 4).all { it > 0 }) return 30
-                }
-                0
-            }
-
-            YACHT -> {
-                if (diceDist.any { it >= N }) 50 else 0
-            }
-
-            CHANCE -> {
-                diceDist.computeSumFaces()
-            }
-        }
-    }
-}
-
-private fun IntArray.computeSumFaces(): Int {
-    check(this.size == M && this.all { it in 0..N }) { throw IllegalStateException("Invalid dice: ${this.contentToString()}") }
-    return this.mapIndexed { index, i -> (index + 1) * i }.sum()
 }
 
 /**

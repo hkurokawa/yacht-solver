@@ -1,4 +1,5 @@
 import net.hydrakecat.yacht.*
+import net.hydrakecat.yacht.ScoreCalculator.calculateScore
 import java.util.*
 
 fun main(args: Array<String>) {
@@ -155,16 +156,12 @@ private data class Board(
 
     fun totalScore() = scores.values.sum() + bonus
     fun score(category: Category, faces: IntArray): Pair<Int, Int> {
-        val delta = category.score(faces)
-        var bonusEarned = false
-        if (EnumSet.range(Category.ACES, Category.SIXES).contains(category)) {
-            if (sumUpperSectionScore() < UPPER_BONUS_MIN && sumUpperSectionScore() + delta >= UPPER_BONUS_MIN) {
-                bonus = UPPER_BONUS
-                bonusEarned = true
-            }
+        val (score, bonus, _) = calculateScore(category, faces.toDist(), sumUpperSectionScore())
+        if (bonus > 0) {
+            this.bonus = bonus
         }
-        scores[category] = delta
-        return Pair(delta, if (bonusEarned) bonus else 0)
+        scores[category] = score
+        return Pair(score, bonus)
     }
 
     override fun toString(): String {
@@ -178,6 +175,13 @@ private data class Board(
         }
         result.append(String.format("\n%15s %3d%n", "Total Score", totalScore()))
         return result.toString()
+    }
+}
+
+// From faces to dist
+private fun IntArray.toDist(): IntArray {
+    return IntArray(M) { num ->
+        this.count { it == num + 1 }
     }
 }
 
