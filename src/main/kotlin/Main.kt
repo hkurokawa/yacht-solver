@@ -22,6 +22,7 @@ fun main(args: Array<String>) {
     when(method) {
         "auto" -> auto(strategy, n, board)
         "manual" -> manual(strategy, n, board)
+        "save" -> return
         else -> throw IllegalArgumentException("Unexpected method name: $method")
     }
     println()
