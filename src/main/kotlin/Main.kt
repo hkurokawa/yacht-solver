@@ -16,7 +16,6 @@ fun main(args: Array<String>) {
         "manual" -> manual(strategy, n, board)
         else -> throw IllegalArgumentException("Unexpected method name: $method")
     }
-
     println()
     println("[Final Result]")
     println(board)
