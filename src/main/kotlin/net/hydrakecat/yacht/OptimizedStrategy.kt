@@ -98,18 +98,19 @@ class OptimizedStrategy {
         return r
     }
 
-    fun computeExpectedScore(numAvailableFirstCategories: Int): Double {
-        val availableCategories = EnumSet.range(
-            Category.ACES,
-            Category.entries[numAvailableFirstCategories - 1]
-        )
-        return computeExpectedScore(BetweenTurnsState(availableCategories, 0))
+    // public for testing
+    internal fun computeExpectedScore(
+        availableCategories: Set<Category>,
+        totalUpperSectionScore: Int = 0,
+    ): Double {
+        val upperScoreLevel = totalUpperSectionScore.coerceAtMost(UPPER_BONUS_MIN)
+        return computeExpectedScore(BetweenTurnsState(availableCategories, upperScoreLevel))
     }
 
     fun save(fileName: String?) {
         if (fileName == null) return
         val categories = Category.entries
-        computeExpectedScore(categories.size)
+        computeExpectedScore(categories.toSet())
         val path = Path.of(fileName)
         if (path.notExists()) {
             println("Saving to $fileName")
