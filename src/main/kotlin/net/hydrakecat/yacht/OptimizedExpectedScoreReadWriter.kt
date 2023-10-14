@@ -10,7 +10,7 @@ import kotlin.io.path.reader
 import kotlin.io.path.writer
 
 object OptimizedExpectedScoreReadWriter {
-    fun save(fileName: String, expectedScore: (Set<Category>, Int) -> Double?) {
+    suspend fun save(fileName: String, expectedScore: (Set<Category>, Int) -> Double?) {
         val categories = Category.entries
         val path = Path.of(fileName)
         if (path.notExists()) {
@@ -46,7 +46,7 @@ object OptimizedExpectedScoreReadWriter {
         }
     }
 
-    fun load(fileName: String, onExpectedScore: (Set<Category>, Int, Double) -> Unit) {
+    suspend fun load(fileName: String, onExpectedScore: (Set<Category>, Int, Double) -> Unit) {
         val path = Path.of(fileName)
         if (path.exists()) {
             println("Loading from $fileName")

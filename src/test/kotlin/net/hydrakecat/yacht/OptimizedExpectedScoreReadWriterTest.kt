@@ -1,6 +1,7 @@
 package net.hydrakecat.yacht
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
 import net.hydrakecat.yacht.OptimizedExpectedScoreReadWriter.load
 import net.hydrakecat.yacht.OptimizedExpectedScoreReadWriter.save
 import org.junit.jupiter.api.AfterEach
@@ -19,7 +20,7 @@ class OptimizedExpectedScoreReadWriterTest {
     }
 
     @Test
-    fun save_and_load() {
+    fun save_and_load() = runBlocking {
         val expected = Array(1 shl Category.entries.size) { DoubleArray(UPPER_BONUS_MIN + 1) }
         var d = 0.0
         repeat(1 shl Category.entries.size) { c ->

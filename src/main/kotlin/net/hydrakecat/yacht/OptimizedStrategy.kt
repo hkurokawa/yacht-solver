@@ -115,7 +115,7 @@ class OptimizedStrategy : Strategy {
         return computeExpectedScore(BetweenTurnsState(availableCategories, upperScoreLevel))
     }
 
-    fun save(fileName: String?) {
+    suspend fun save(fileName: String?) {
         if (fileName == null) return
         computeExpectedScore(Category.entries.toSet())
         OptimizedExpectedScoreReadWriter.save(fileName) { categories, us ->
@@ -126,7 +126,7 @@ class OptimizedStrategy : Strategy {
         }
     }
 
-    fun load(fileName: String?) {
+    suspend fun load(fileName: String?) {
         if (fileName == null) return
         OptimizedExpectedScoreReadWriter.load(fileName) { categories, us, score ->
             memoizedBetweenTurnsE[BetweenTurnsState(

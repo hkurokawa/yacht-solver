@@ -7,14 +7,16 @@ fun main(args: Array<String>) {
     if (args.isEmpty()) {
         throw IllegalArgumentException("Usage: java -jar <jar file> save|auto|manual <file name>")
     }
-    val strategy = OptimizedStrategy()
-    runBlocking { strategy.init() }
     val method = args.getOrNull(0) ?: "auto"
-    if (method == "save") {
-        strategy.save(args.getOrNull(1) ?: DEFAULT_FILE_NAME)
-        return
+    val strategy = OptimizedStrategy()
+    runBlocking {
+        strategy.init()
+        if (method == "save") {
+            strategy.save(args.getOrNull(1) ?: DEFAULT_FILE_NAME)
+            return@runBlocking
+        }
+        strategy.load(args.getOrNull(1) ?: DEFAULT_FILE_NAME)
     }
-    strategy.load(args.getOrNull(1) ?: DEFAULT_FILE_NAME)
     val n = 3
     val board = Board()
     when(method) {
