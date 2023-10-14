@@ -51,6 +51,12 @@ class OptimizedStrategy {
     // Probability to transit from the ith distribution to the kth distribution when choosing the jth choice
     private val transDistProb: Array<Array<DoubleArray>>
 
+    // Score when selecting the ith distribution, j upper section score level and the kth Category
+    private val scores: Array<Array<IntArray>>
+
+    // New upper section score level when selecting the ith distribution, j upper section score level and the kth Category
+    private val usls: Array<Array<IntArray>>
+
     init {
         val numbersWithProbList = rolledDiceDist(N)
         val n = numbersWithProbList.size
@@ -67,6 +73,8 @@ class OptimizedStrategy {
         transDists = Array(n) { Array(maxNumChoices) { IntArray(0) } }
         transDistProb = Array(n) { Array(maxNumChoices) { DoubleArray(0) } }
         choice = Array(n) { Array(maxNumChoices) { IntArray(0) } }
+        scores = Array(n) { Array(UPPER_BONUS_MIN + 1) { IntArray(Category.entries.size) } }
+        usls = Array(n) { Array(UPPER_BONUS_MIN + 1) { IntArray(Category.entries.size) } }
         for (i in 0..<n) {
             listSubsets(dists[i]).forEachIndexed { j, kept ->
                 choice[i][j] = kept
@@ -86,6 +94,14 @@ class OptimizedStrategy {
                 }
                 transDists[i][j] = distList.toIntArray()
                 transDistProb[i][j] = probList.toDoubleArray()
+            }
+            repeat(UPPER_BONUS_MIN + 1) { j ->
+                for (category in Category.entries) {
+                    val k = category.ordinal
+                    val (score, bonus, newUsl) = calculateScore(category, dists[i], j)
+                    scores[i][j][k] = score + bonus
+                    usls[i][j][k] = newUsl.coerceAtMost(UPPER_BONUS_MIN)
+                }
             }
         }
     }
@@ -191,7 +207,7 @@ class OptimizedStrategy {
             dp[1][i] = 0.0
             for (c in categories) {
                 dp[1][i] = max(
-                    dp[1][i], scoreIfChoose(categories, usl, dists[i], c)
+                    dp[1][i], scoreIfChoose(categories, usl, i, c)
                 )
             }
         }
@@ -222,13 +238,11 @@ class OptimizedStrategy {
     private fun scoreIfChoose(
         availableCategories: Set<Category>,
         usl: Int,
-        dist: IntArray,
+        distId: Int,
         category: Category,
     ): Double {
-        var (score, bonus, newUsl) = calculateScore(category, dist, usl)
-        newUsl = newUsl.coerceAtMost(UPPER_BONUS_MIN)
-        return score + bonus + computeExpectedScore(
-            BetweenTurnsState(availableCategories - category, newUsl)
+        return scores[distId][usl][category.ordinal] + computeExpectedScore(
+            BetweenTurnsState(availableCategories - category, usls[distId][usl][category.ordinal])
         )
     }
 
@@ -246,12 +260,13 @@ class OptimizedStrategy {
         check(faces.size == N && faces.all { it in 1..M }) { "Invalid faces: ${faces.contentToString()}" }
 
         val dist = faces.toDist()
+        val distId = dists.indexOfFirst { it.contentEquals(dist) }
         val usl = upperTotalScore.coerceAtMost(
             UPPER_BONUS_MIN
         )
         if (numRemainRolls == 0) {
             return categories.map { c ->
-                Pair(c, scoreIfChoose(categories, usl, dist, c))
+                Pair(c, scoreIfChoose(categories, usl, distId, c))
             }.sortedByDescending { it.second }.take(n).map { Choice.Select(it.first, it.second) }
         }
         val dp = Array(2) { DoubleArray(dists.size) }
@@ -259,7 +274,7 @@ class OptimizedStrategy {
             dp[1][i] = 0.0
             for (c in categories) {
                 dp[1][i] = max(
-                    dp[1][i], scoreIfChoose(categories, usl, dists[i], c)
+                    dp[1][i], scoreIfChoose(categories, usl, i, c)
                 )
             }
         }
@@ -281,7 +296,7 @@ class OptimizedStrategy {
         }
 
         // Find the optimal keep for the given distribution
-        val i = dists.indexOfFirst { it.contentEquals(dist) }
+        val i = distId
         val keptScorePairs = (0..<numChoices[i]).map { k ->
             var score = 0.0
             for (j in transDists[i][k].indices) {
@@ -293,7 +308,7 @@ class OptimizedStrategy {
             .take(n).map { (k, score) ->
                 if (k.contentEquals(dist)) {
                     // Keeping all the dice mean we want to select the Category here
-                    val category = categories.maxBy { scoreIfChoose(categories, usl, dist, it) }
+                    val category = categories.maxBy { scoreIfChoose(categories, usl, distId, it) }
                     Choice.Select(category, score)
                 } else {
                     Choice.Keep(k.toFaces().toList(), score)
