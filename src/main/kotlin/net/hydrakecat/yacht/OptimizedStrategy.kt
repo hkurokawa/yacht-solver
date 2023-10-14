@@ -153,6 +153,22 @@ class OptimizedStrategy {
         categories: Set<Category>,
         usl: Int,
     ): Double {
+        val expectedScoreByDist = expectedScoreByDist(categories, usl, R)
+        var e = 0.0
+        for (i in dists.indices) {
+            e += expectedScoreByDist[i] * prob[i]
+        }
+        return e
+    }
+
+    // List of expected scores when we get a distribution for the given upper section score level
+    // and the number of remaining rolls.
+    // @return a mapping from the distribution ID to the expected score
+    private fun expectedScoreByDist(
+        categories: Set<Category>,
+        usl: Int,
+        numRemainRolls: Int
+    ): DoubleArray {
         val dp = Array(2) { DoubleArray(dists.size) }
         for (i in dists.indices) {
             dp[1][i] = 0.0
@@ -164,7 +180,7 @@ class OptimizedStrategy {
         }
         var current = 0
         var next = 1
-        repeat(R - 1) {
+        repeat(numRemainRolls - 1) {
             dp[current] = dp[next].copyOf()
             for (i in dists.indices) {
                 repeat(numChoices[i]) { k ->
@@ -178,11 +194,7 @@ class OptimizedStrategy {
             current = 1 - current
             next = 1 - next
         }
-        var e = 0.0
-        for (i in dists.indices) {
-            e += dp[next][i] * prob[i]
-        }
-        return e
+        return dp[next]
     }
 
     // Returns the expected score if choosing [category] when the dice number distribution is [dist]
@@ -215,50 +227,31 @@ class OptimizedStrategy {
         val usl = upperTotalScore.coerceAtMost(
             UPPER_BONUS_MIN
         )
+        // We have no other choices than selecting the category
         if (numRemainRolls == 0) {
             return categories.map { c ->
                 Pair(c, scoreIfChoose(categories, usl, distId, c))
             }.sortedByDescending { it.second }.take(n).map { Choice.Select(it.first, it.second) }
         }
-        val dp = Array(2) { DoubleArray(dists.size) }
-        for (i in dists.indices) {
-            dp[1][i] = 0.0
-            for (c in categories) {
-                dp[1][i] = max(
-                    dp[1][i], scoreIfChoose(categories, usl, i, c)
-                )
-            }
-        }
-        var current = 0
-        var next = 1
-        repeat(numRemainRolls - 1) {
-            dp[current] = dp[next].copyOf()
-            for (i in dists.indices) {
-                repeat(numChoices[i]) { k ->
-                    var score = 0.0
-                    for (j in transDists[i][k].indices) {
-                        score += dp[next][transDists[i][k][j]] * transDistProb[i][k][j]
-                    }
-                    dp[current][i] = max(dp[current][i], score)
-                }
-            }
-            current = 1 - current
-            next = 1 - next
-        }
+
+        val expectedScoreByDist = expectedScoreByDist(categories, usl, numRemainRolls)
 
         // Find the optimal keep for the given distribution
         val i = distId
-        val keptScorePairs = (0..<numChoices[i]).map { k ->
+        val choiceScorePairs = (0..<numChoices[i]).map { k ->
+            // If we choose the kth choice
             var score = 0.0
             for (j in transDists[i][k].indices) {
-                score += dp[next][transDists[i][k][j]] * transDistProb[i][k][j]
+                // Add the expected score when we have transDists[i][k][j] distribution
+                score += expectedScoreByDist[transDists[i][k][j]] * transDistProb[i][k][j]
             }
             Pair(choice[i][k], score)
         }
-        return keptScorePairs.sortedWith { o1, o2 -> if (o1.second < o2.second) 1 else if (o1.second > o2.second) -1 else o2.first.sum() - o1.first.sum() }
+        // Sort by the score in descending order with a tiebreaker preferring SELECT to KEEP
+        return choiceScorePairs.sortedWith { o1, o2 -> if (o1.second < o2.second) 1 else if (o1.second > o2.second) -1 else o2.first.sum() - o1.first.sum() }
             .take(n).map { (k, score) ->
                 if (k.contentEquals(dist)) {
-                    // Keeping all the dice mean we want to select the Category here
+                    // Keeping all the dice means we want to select the Category here
                     val category = categories.maxBy { scoreIfChoose(categories, usl, distId, it) }
                     Choice.Select(category, score)
                 } else {
