@@ -1,5 +1,7 @@
 package net.hydrakecat.yacht
 
+import net.hydrakecat.yacht.DiceDistCalculator.rolledDiceDist
+import net.hydrakecat.yacht.DiceDistSubsetEnumerator.listSubsets
 import java.io.PrintWriter
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -9,10 +11,9 @@ import kotlin.io.path.notExists
 import kotlin.io.path.reader
 import kotlin.io.path.writer
 import kotlin.math.max
-import kotlin.math.pow
 
 
-// Number of dices
+// Number of dice
 const val N = 5
 
 // Num faces of the dice
@@ -29,19 +30,21 @@ const val UPPER_BONUS = 35
 class OptimizedStrategy {
     private val memoizedBetweenTurnsE = HashMap<BetweenTurnsState, Double>()
 
-    // List of possible number distribution when rolling N dices
+    // List of possible number distribution when rolling N dice
+    // e.g., [[N, 0, 0, 0, 0, 0], [N - 1, 1, 0, 0, 0, 0], ..., [0, 0, 0, 0, 0, N]]
     private val dists: Array<IntArray>
 
-    // Probability to see the ith distribution of numbers when rolling N dices
+    // Probability to see the ith distribution of numbers when rolling N dice
     private val prob: DoubleArray
 
-    // Number of possible choices to keep when the ith distribution of N dices is given
+    // Number of possible choices to keep when the ith distribution of N dice is given
     private val numChoices: IntArray
 
-    // List of distributions of dices that is chosen when the ith distribution is given and the jth choice is selected
+    // List of distributions of dice that is chosen when the ith distribution is given and the jth choice is selected
+    // For example, if [N, 0, 0, 0, 0, 0] is given and the first choice is keeping only one 1, choice[0][0] = [1, 0, 0, 0, 0, 0]
     private val choice: Array<Array<IntArray>>
 
-    // List of distributions of N dices that could be derived from the ith distribution when choosing the jth choice
+    // List of distributions of N dice that could be derived from the ith distribution when choosing the jth choice
     private val transDists: Array<Array<IntArray>>
 
     // Probability to transit from the ith distribution to the kth distribution when choosing the jth choice
@@ -53,24 +56,24 @@ class OptimizedStrategy {
         dists = Array(n) { IntArray(M) }
         prob = DoubleArray(n)
         numChoices = IntArray(n)
-        var C = 0
+        var maxNumChoices = 0
         for (i in numbersWithProbList.indices) {
-            dists[i] = numbersWithProbList[i].roll.dist
+            dists[i] = numbersWithProbList[i].dist
             prob[i] = numbersWithProbList[i].probability
-            numChoices[i] = chooseKeep(dists[i]).size
-            C = max(C, numChoices[i])
+            numChoices[i] = listSubsets(dists[i]).size
+            maxNumChoices = max(maxNumChoices, numChoices[i])
         }
-        transDists = Array(n) { Array(C) { IntArray(0) } }
-        transDistProb = Array(n) { Array(C) { DoubleArray(0) } }
-        choice = Array(n) { Array(C) { IntArray(0) } }
+        transDists = Array(n) { Array(maxNumChoices) { IntArray(0) } }
+        transDistProb = Array(n) { Array(maxNumChoices) { DoubleArray(0) } }
+        choice = Array(n) { Array(maxNumChoices) { IntArray(0) } }
         for (i in 0..<n) {
-            chooseKeep(dists[i]).forEachIndexed { j, kept ->
+            listSubsets(dists[i]).forEachIndexed { j, kept ->
                 choice[i][j] = kept
                 val distList = mutableListOf<Int>()
                 val probList = mutableListOf<Double>()
-                // the jth choice is selected and we keep the dist of kept
+                // the jth choice is selected, and we keep the dist of kept
                 for ((d, p) in rolledDiceDist(N - kept.sum())) {
-                    val ns = merge(kept, d.dist)
+                    val ns = merge(kept, d)
                     val k = dists.indexOfFirst {
                         it.contentEquals(ns)
                     }
@@ -294,85 +297,13 @@ class OptimizedStrategy {
         return keptScorePairs.sortedByDescending { it.second }
             .take(n).map { (k, score) ->
                 if (k.contentEquals(dist)) {
-                    // Keeping all the dices mean we want to select the Category here
+                    // Keeping all the dice mean we want to select the Category here
                     val category = categories.maxBy { scoreIfChoose(categories, usl, dist, it) }
                     Choice.Select(category, score)
                 } else {
                     Choice.Keep(k.toFaces().toList(), score)
                 }
             }
-    }
-
-    // Returns all the possible dices to keep
-    fun chooseKeep(rolledDiceDist: IntArray): List<IntArray> {
-        val list: MutableList<IntArray> = ArrayList()
-        for (i in 0..Arrays.stream(rolledDiceDist).sum()) {
-            list.addAll(chooseKeepIter(rolledDiceDist, 0, IntArray(M), i))
-        }
-        return list
-    }
-
-    private fun chooseKeepIter(
-        remaining: IntArray, currentIdx: Int, candidate: IntArray,
-        numToChoose: Int,
-    ): List<IntArray> {
-        var idx = currentIdx
-        if (numToChoose == 0) {
-            return listOf(candidate.copyOf(candidate.size))
-        }
-        while (idx < M && remaining[idx] == 0) idx++
-        if (idx >= M) return emptyList()
-        val list: MutableList<IntArray> = ArrayList()
-        for (i in 0..remaining[idx]) {
-            // If choose i dices from the currentIdx
-            candidate[idx] += i
-            remaining[idx] -= i
-            list.addAll(chooseKeepIter(remaining, idx + 1, candidate, numToChoose - i))
-            candidate[idx] -= i
-            remaining[idx] += i
-        }
-        return list
-    }
-
-    // Returns all the possible rolled dices for num dices with its probability
-    fun rolledDiceDist(num: Int): List<RollWithProbability> {
-        val rolls = rolledDiceIter(0, IntArray(M), num)
-        return rolls.map { roll: IntArray ->
-            check(
-                roll.sum() == num
-            ) { "Total num of rolls should be equal to $num : ${roll.contentToString()}" }
-            var p = 1.0
-            var n = num
-            for (c in roll) {
-                if (c == 0) continue
-                p *= ncr(n, c)
-                n -= c
-            }
-            p /= M.toDouble().pow(num.toDouble())
-            RollWithProbability(roll, p)
-        }
-    }
-
-    private fun ncr(n: Int, r: Int): Double {
-        if (n < r) return 0.0
-        if (n - r < r) return ncr(n, n - r)
-        var a = 1.0
-        for (i in n downTo n - r + 1) a *= i.toDouble()
-        for (i in r downTo 2) a /= i.toDouble()
-        return a
-    }
-
-    private fun rolledDiceIter(startValue: Int, roll: IntArray, numDices: Int): List<IntArray> {
-        if (numDices == 0) {
-            return listOf(roll)
-        }
-        val list = mutableListOf<IntArray>()
-        for (i in startValue..<M) {
-            val u = roll.copyOf(roll.size)
-            u[i]++
-            list.addAll(rolledDiceIter(i, u, numDices - 1))
-        }
-        return list
     }
 }
 
@@ -465,39 +396,8 @@ enum class Category {
 }
 
 private fun IntArray.computeSumFaces(): Int {
-    check(this.size == M && this.all { it in 0..N }) { throw IllegalStateException("Invalid dices: ${this.contentToString()}") }
+    check(this.size == M && this.all { it in 0..N }) { throw IllegalStateException("Invalid dice: ${this.contentToString()}") }
     return this.mapIndexed { index, i -> (index + 1) * i }.sum()
-}
-
-data class Roll(val dist: IntArray) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is Roll) return false
-
-        if (!dist.contentEquals(other.dist)) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        return dist.contentHashCode()
-    }
-
-    override fun toString(): String {
-        return dist.contentToString()
-    }
-
-    operator fun plus(other: Roll): Roll {
-        val s = this.dist.copyOf()
-        for (i in other.dist.indices) {
-            s[i] += other.dist[i]
-        }
-        return Roll(s)
-    }
-}
-
-data class RollWithProbability(val roll: Roll, val probability: Double) {
-    constructor(dist: IntArray, probability: Double) : this(Roll(dist), probability)
 }
 
 /**
@@ -521,7 +421,7 @@ private data class BetweenTurnsState(
 }
 
 sealed interface Choice {
-    data class Keep(val dices: List<Int>, val expect: Double) : Choice
+    data class Keep(val dice: List<Int>, val expect: Double) : Choice
 
     data class Select(val category: Category, val expect: Double) : Choice
 }

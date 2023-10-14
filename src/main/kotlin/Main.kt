@@ -45,9 +45,9 @@ private fun auto(
             println("Best choice: $choices")
             when (val choice = choices[0]) {
                 is Choice.Keep -> {
-                    println("Keep ${choice.dices}")
+                    println("Keep ${choice.dice}")
                     faces =
-                        (choice.dices.toIntArray() + rollDice(faces.size - choice.dices.size).toList()).sortedArray()
+                        (choice.dice.toIntArray() + rollDice(faces.size - choice.dice.size).toList()).sortedArray()
                 }
 
                 is Choice.Select -> {
@@ -105,7 +105,7 @@ fun readCategory(availableCategories: Set<Category>): Category {
 
 private fun readChoice(): Boolean {
     while (true) {
-        print("Input C: Choose category or K: Keep some and roll the dices: ")
+        print("Input C: Choose category or K: Keep some and roll the dice: ")
         val l = readln()
         when (l) {
             "C" -> return true
