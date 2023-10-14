@@ -289,7 +289,7 @@ class OptimizedStrategy {
             }
             Pair(choice[i][k], score)
         }
-        return keptScorePairs.sortedByDescending { it.second }
+        return keptScorePairs.sortedWith { o1, o2 -> if (o1.second < o2.second) 1 else if (o1.second > o2.second) -1 else o2.first.sum() - o1.first.sum() }
             .take(n).map { (k, score) ->
                 if (k.contentEquals(dist)) {
                     // Keeping all the dice mean we want to select the Category here
