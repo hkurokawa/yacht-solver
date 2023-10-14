@@ -14,6 +14,7 @@ class OptimizedStrategyTest {
     @BeforeEach
     fun setup(): Unit = runBlocking {
         strategy.init()
+        strategy.load("expected_scores.txt")
     }
 
     @Test
@@ -61,5 +62,57 @@ class OptimizedStrategyTest {
     fun computeExpectedScore_allSectionsAvailable() {
         val actual = strategy.computeExpectedScore(Category.entries.toSet())
         assertThat(actual).isEqualTo(191.76087975216507)
+    }
+
+    @Test
+    fun chooseBest_noRemainingRolls_ACEStoFOURSAvailable_44444_chooseFOURS() {
+        val actual =
+            strategy.chooseBest(
+                n = 1,
+                categories = EnumSet.range(Category.ACES, Category.FOURS),
+                upperTotalScore = 0,
+                numRemainRolls = 0,
+                faces = intArrayOf(4, 4, 4, 4, 4)
+            )
+        // The expected score is 20 (when selecting FOURS) + total expected score when ACES - THREES are available
+        assertThat(actual).containsExactly(Choice.Select(Category.FOURS, 35.21518647369186))
+    }
+
+    @Test
+    fun chooseBest_2remainingRolls_onlyYACHTAvailable_12345() {
+        val actual =
+            strategy.chooseBest(
+                n = 1,
+                categories = EnumSet.of(Category.YACHT),
+                upperTotalScore = 0,
+                numRemainRolls = 2,
+                faces = intArrayOf(1, 2, 3, 4, 5)
+            )
+        assertThat(actual).containsExactly(Choice.Keep(listOf(1), 0.6315729309556476))
+    }
+
+    @Test
+    fun chooseBest_KeepAndSelectHasTheSameExpectedScore_shouldPreferSelect() {
+        // This is from the actual game play.  FULL HOUSE and LARGE STRAIGHT were taken and the 2nd
+        // roll was [3, 4, 5, 6, 6].  In this case, the strategy should choose SMALL STRAIGHT
+        // immediately without thinking about the 3rd dice roll.
+        val actual =
+            strategy.chooseBest(
+                n = 3,
+                categories = EnumSet.complementOf(
+                    EnumSet.of(
+                        Category.FULL_HOUSE,
+                        Category.LARGE_STRAIGHT
+                    )
+                ),
+                upperTotalScore = 0,
+                numRemainRolls = 1,
+                faces = intArrayOf(3, 4, 5, 6, 6)
+            )
+        assertThat(actual).containsExactly(
+            Choice.Select(Category.SMALL_STRAIGHT, 144.4186587339747),
+            Choice.Keep(listOf(3, 4, 5, 6), 144.4186587339747),
+            Choice.Keep(listOf(6, 6), 143.39057619595297),
+        ).inOrder()
     }
 }
