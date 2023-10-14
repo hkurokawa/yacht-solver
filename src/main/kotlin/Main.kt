@@ -1,3 +1,4 @@
+import kotlinx.coroutines.runBlocking
 import net.hydrakecat.yacht.*
 import net.hydrakecat.yacht.ScoreCalculator.calculateScore
 import java.util.*
@@ -7,6 +8,7 @@ fun main(args: Array<String>) {
         throw IllegalArgumentException("Usage: java -jar <jar file> save|auto|manual <file name>")
     }
     val strategy = OptimizedStrategy()
+    runBlocking { strategy.init() }
     val method = args.getOrNull(0) ?: "auto"
     if (method == "save") {
         strategy.save(args.getOrNull(1) ?: DEFAULT_FILE_NAME)

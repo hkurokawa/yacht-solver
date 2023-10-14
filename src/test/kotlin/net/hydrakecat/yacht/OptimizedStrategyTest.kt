@@ -1,6 +1,8 @@
 package net.hydrakecat.yacht
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Disabled
 import java.util.*
 import kotlin.test.Test
@@ -8,6 +10,11 @@ import kotlin.test.Test
 
 class OptimizedStrategyTest {
     private val strategy = OptimizedStrategy()
+
+    @BeforeEach
+    fun setup(): Unit = runBlocking {
+        strategy.init()
+    }
 
     @Test
     fun computeExpectedScore_onlyAcesAvailable() {

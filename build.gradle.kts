@@ -12,6 +12,11 @@ repositories {
 }
 
 dependencies {
+    implementation(
+        group = "org.jetbrains.kotlinx",
+        name = "kotlinx-coroutines-core",
+        version = "1.7.3"
+    )
     testImplementation(kotlin("test"))
     testImplementation(group = "com.google.truth", name = "truth", version = "1.1.4")
 }

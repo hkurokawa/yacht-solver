@@ -20,36 +20,36 @@ const val UPPER_BONUS_MIN = 63
 
 const val UPPER_BONUS = 35
 
-class OptimizedStrategy {
+class OptimizedStrategy : Strategy {
     private val memoizedBetweenTurnsE = HashMap<BetweenTurnsState, Double>()
 
     // List of possible number distribution when rolling N dice
     // e.g., [[N, 0, 0, 0, 0, 0], [N - 1, 1, 0, 0, 0, 0], ..., [0, 0, 0, 0, 0, N]]
-    private val dists: Array<IntArray>
+    private lateinit var dists: Array<IntArray>
 
     // Probability to see the ith distribution of numbers when rolling N dice
-    private val prob: DoubleArray
+    private lateinit var prob: DoubleArray
 
     // Number of possible choices to keep when the ith distribution of N dice is given
-    private val numChoices: IntArray
+    private lateinit var numChoices: IntArray
 
     // List of distributions of dice that is chosen when the ith distribution is given and the jth choice is selected
     // For example, if [N, 0, 0, 0, 0, 0] is given and the first choice is keeping only one 1, choice[0][0] = [1, 0, 0, 0, 0, 0]
-    private val choice: Array<Array<IntArray>>
+    private lateinit var choice: Array<Array<IntArray>>
 
     // List of distributions of N dice that could be derived from the ith distribution when choosing the jth choice
-    private val transDists: Array<Array<IntArray>>
+    private lateinit var transDists: Array<Array<IntArray>>
 
     // Probability to transit from the ith distribution to the kth distribution when choosing the jth choice
-    private val transDistProb: Array<Array<DoubleArray>>
+    private lateinit var transDistProb: Array<Array<DoubleArray>>
 
     // Score when selecting the ith distribution, j upper section score level and the kth Category
-    private val scores: Array<Array<IntArray>>
+    private lateinit var scores: Array<Array<IntArray>>
 
     // New upper section score level when selecting the ith distribution, j upper section score level and the kth Category
-    private val usls: Array<Array<IntArray>>
+    private lateinit var usls: Array<Array<IntArray>>
 
-    init {
+    override suspend fun init() {
         val numbersWithProbList = rolledDiceDist(N)
         val n = numbersWithProbList.size
         dists = Array(n) { IntArray(M) }
@@ -210,7 +210,7 @@ class OptimizedStrategy {
     }
 
     // For the given board, returns the best [n] choice
-    fun chooseBest(
+    override fun chooseBest(
         n: Int,
         categories: Set<Category>,
         upperTotalScore: Int,
@@ -294,10 +294,4 @@ private data class BetweenTurnsState(
             "Invalid upper score level: $upperScoreLevel"
         }
     }
-}
-
-sealed interface Choice {
-    data class Keep(val dice: List<Int>, val expect: Double) : Choice
-
-    data class Select(val category: Category, val expect: Double) : Choice
 }
